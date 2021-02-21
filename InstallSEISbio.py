@@ -259,7 +259,7 @@ def install_virtual_envs():
         'hisat2',
         'salmon',
         'star',
-        'tetoolkit',
+        # 'tetoolkit', #  21 feb 21 No resolvio el env.... Un poco de suerte?
         'cufflinks',
         # # Bioconduxctor envs
         'bioconductor-fourcseq',
