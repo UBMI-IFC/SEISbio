@@ -41,7 +41,7 @@ def debian_install_bioinfo():
                    'emboss',
                    'ncbi-blast+',
                    'hmmer',
-                   't-coffe',
+                   't-coffee',
                    'muscle',
                    'probcons',
                    'phylip',
@@ -52,15 +52,15 @@ def debian_install_bioinfo():
                    'clustalo',
                    ]
 
-    print('[INFO] Updating and upgrading system (Debian/Ubuntu)']
+    print('[INFO] Updating and upgrading system (Debian/Ubuntu)')
     run(cmd_update)
     run(cmd_upgrade)
 
-    print('[INFO] Installing helping packages (Debian/Ubuntu)']
+    print('[INFO] Installing helping packages (Debian/Ubuntu)')
     run(cmd_basic)
 
     print('''[INFO] Installing Bioinformatic programs from repositories 
-             (Debian/Ubuntu)''']
+             (Debian/Ubuntu)''')
     run(cmd_bioinfo)
 
 
@@ -149,9 +149,9 @@ def update_miniconda():
 
 
 def install_conda_base():
-    "Completing miniconda base environment with scientific packages
+    """Completing miniconda base environment with scientific packages
 
-    Using default conda repository"
+    Using default conda repository"""
     os.chdir('/home/anaconda/')
     myenv = os.environ.copy()
     myenv['HOME'] = '/home/anaconda'
