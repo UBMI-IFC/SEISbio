@@ -254,7 +254,7 @@ def install_virtual_envs():
         'prokka',
         'bowtie2',
         'bwa',
-        # 'velvet',        
+        # 'velvet',
         # # RNAseq specific
         'hisat2',
         'salmon',
@@ -262,14 +262,14 @@ def install_virtual_envs():
         # 'tetoolkit', #  21 feb 21 No resolvio el env.... Un poco de suerte?
         'cufflinks',
         # # Bioconduxctor envs
-        'bioconductor-fourcseq',
+        # 'bioconductor-fourcseq', # dont resolve
         'bioconductor-deseq2',
         # # Highrhoughput sequencing
         'htseq',
         # # HiC
         'hicexplorer',
-        'hicexplorer=3.2',
-        'cooler',        
+        # 'hicexplorer=3.6',
+        'cooler',
         'hint',
         'hicup',
         'hic2cool',
