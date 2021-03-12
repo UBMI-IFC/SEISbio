@@ -195,7 +195,12 @@ def install_virtual_envs():
     ### Snakepipes
     if 'snakePipes' not in env_info:
         print('[INSTALLING] snakePipes environmet.')
-        run('conda create -n snakePipes -c mpi-ie -c bioconda -c conda-forge snakePipes -y', shell=True)
+        cmd = '/home/anaconda/miniconda3/bin/conda create -n snakePipes -c mpi-ie -c bioconda -c conda-forge snakePipes -y'.split()
+        run(cmd, preexec_fn=demote(1015, 1015), env=myenv)
+        ### Creating /data/extended/
+        print('    ... creating /data/extended')
+        cmd = "mkdir -p -m 777 /data/extended".split()
+        run(cmd)
     else:
         print('[NOT INSTALLING] snakePipes already isntalled')
 
