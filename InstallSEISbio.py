@@ -89,6 +89,11 @@ def download_miniconda():
     cmd = ['wget', '-N', conda_url]
     return run(cmd, preexec_fn=demote(1015, 1015))
 
+def download_mambaforge():
+    """Download mambaforge"""
+    mambaforge_url = 'https://github.com/conda-forge/miniforge/releases/latest/download/Mambaforge-Linux-x86_64.sh'
+    cmd = ['wget', '-N', mambaforge_url]
+    return run(cmd, preexec_fn=demote(1015, 1015))
 
 def install_miniconda():
     """Comands for Download miniconda, install in /home/anaconda/ and
@@ -112,6 +117,23 @@ def install_miniconda():
     cmd_init = ['/home/anaconda/miniconda3/bin/conda', 'init']
     run(cmd_init, preexec_fn=demote(1015, 1015), env=myenv)
 
+def install_mambaforge():
+    """Comands for Download miniconda, install in /home/anaconda/ and
+    run conda init (<- only for anaconda user)
+    """
+    myenv = os.environ.copy()
+    myenv['HOME'] = '/home/anaconda'
+    run(['echo', '$HOME'])
+    # INSTALL
+    ## TODO : define by the user the conda prefix
+    cmd = ['bash', '/home/anaconda/Mambaforge-Linux-x86_64.sh', '-b',
+           '-p', '/home/anaconda/mambaforge']
+    run(cmd, preexec_fn=demote(1015, 1015), env=myenv)
+    # init conda
+    cmd_init = ['/home/anaconda/mambaforge/bin/conda', 'init']
+    run(cmd_init, preexec_fn=demote(1015, 1015), env=myenv)
+    
+    
 def update_miniconda():
     """Update miniconda installation
     """
@@ -147,6 +169,21 @@ def update_miniconda():
     # CONDA_PREFIX_1 /home/acph/anaconda3
     ###
 
+def update_mambaforge():
+    """Update miniconda installation
+    """
+    os.chdir('/home/anaconda/')
+    myenv = os.environ.copy()
+    myenv['HOME'] = '/home/anaconda'
+
+    cmd = ['/home/anaconda/mambaforge/bin/mamba',
+           'update',
+           '-p',
+           '/home/anaconda/mambaforge',
+           '-y',
+           '--all']
+    run(cmd, preexec_fn=demote(1015, 1015), env=myenv)
+    
 
 def install_conda_base():
     """Completing miniconda base environment with scientific packages
@@ -178,6 +215,36 @@ def install_conda_base():
            ]
     run(cmd, preexec_fn=demote(1015, 1015), env=myenv)
 
+def install_mambaforge_base():
+    """Completing miniconda base environment with scientific packages
+
+    Using conda-forge"""
+    os.chdir('/home/anaconda/')
+    myenv = os.environ.copy()
+    myenv['HOME'] = '/home/anaconda'
+    cmd = ['/home/anaconda/mambaforge/bin/mamba',
+           'install',
+           '-p',
+           '/home/anaconda/mambaforge',
+           '-y',
+           'numpy',
+           'scipy',
+           'matplotlib',
+           'pandas',
+           'statsmodels',
+           'seaborn',
+           'biopython',
+           'scikit-learn',
+           'scikit-image',
+           'networkx',
+           'jupyter',
+           'spyder',
+           'orange3',
+           'keras',
+           'jupyterlab',
+           ]
+    run(cmd, preexec_fn=demote(1015, 1015), env=myenv)
+    
 
 def install_virtual_envs():
     """Installing virtual environments for many bioinformatics programs from:
@@ -195,12 +262,16 @@ def install_virtual_envs():
     ### Snakepipes
     if 'snakePipes' not in env_info:
         print('[INSTALLING] snakePipes environmet.')
+<<<<<<< HEAD
+        run('/home/anaconda/miniconda3/bin/conda create -n snakePipes -c mpi-ie -c bioconda -c conda-forge snakePipes -y', shell=True)
+=======
         cmd = '/home/anaconda/miniconda3/bin/conda create -n snakePipes -c mpi-ie -c bioconda -c conda-forge snakePipes -y'.split()
         run(cmd, preexec_fn=demote(1015, 1015), env=myenv)
         ### Creating /data/extended/
         print('    ... creating /data/extended')
         cmd = "mkdir -p -m 777 /data/extended".split()
         run(cmd)
+>>>>>>> 9aecbe12e8c9bb7adc065b2559ea7f48139d0460
     else:
         print('[NOT INSTALLING] snakePipes already isntalled')
 
@@ -237,6 +308,8 @@ def install_virtual_envs():
     # conda create -n samtools-env -c bioconda -c conda-forge samtools -y ;
     
     gen_pkg = [
+        # more general than general
+        'r-base',
         # general use
         'repeatmasker',
         'fastqc',
@@ -256,7 +329,7 @@ def install_virtual_envs():
         'abyss',
         'spades',
         'quast',
-        'prokka',
+        # 'prokka',
         'bowtie2',
         'bwa',
         # 'velvet',
@@ -267,14 +340,23 @@ def install_virtual_envs():
         # 'tetoolkit', #  21 feb 21 No resolvio el env.... Un poco de suerte?
         'cufflinks',
         # # Bioconduxctor envs
+<<<<<<< HEAD
+        # 'bioconductor-fourcseq',
+=======
         # 'bioconductor-fourcseq', # dont resolve
+>>>>>>> 9aecbe12e8c9bb7adc065b2559ea7f48139d0460
         'bioconductor-deseq2',
         # # Highrhoughput sequencing
         'htseq',
         # # HiC
         'hicexplorer',
+<<<<<<< HEAD
+        # 'hicexplorer=3.2',
+        'cooler',        
+=======
         # 'hicexplorer=3.6',
         'cooler',
+>>>>>>> 9aecbe12e8c9bb7adc065b2559ea7f48139d0460
         'hint',
         'hicup',
         'hic2cool',
@@ -312,6 +394,105 @@ def install_virtual_envs():
         else:
             print('[NOT INSTALLING]', envname, 'already installed!')
 
+def install_virtual_envs_mamba():
+    """Installing virtual environments for many bioinformatics programs from:
+    - conda-forge
+    - bioconda
+    - Other repositories
+    """
+    # basic config
+    os.chdir('/home/anaconda/')
+    myenv = os.environ.copy()
+    myenv['HOME'] = '/home/anaconda'
+
+    env_info = run('/home/anaconda/mambaforge/bin/mamba info --env', shell=True, stdout=PIPE)
+    env_info = env_info.stdout.decode()
+    ### Snakepipes
+    if 'snakePipes' not in env_info:
+        print('[INSTALLING] snakePipes environmet.')
+        run('/home/anaconda/mambaforge/bin/mamba create -n snakePipes -c mpi-ie -c bioconda -c conda-forge snakePipes -y', shell=True)
+    else:
+        print('[NOT INSTALLING] snakePipes already isntalled')
+
+    gen_pkg = [
+        # more general than general
+        'r-base',
+        # general use
+        'repeatmasker',
+        'fastqc',
+        'multiqc',        
+        'macs2',
+        'trim-galore',
+        'trimmomatic',
+        'igv',
+        'samtools',
+        'bedtools',
+        'meme',
+        'homer',
+        'deeptools',
+        'picard',
+        'kallisto',
+        # # genome assembly alignment
+        'abyss',
+        'spades',
+        'quast',
+        'prokka',
+        'bowtie2',
+        'bwa',
+        # 'velvet',        
+        # # RNAseq specific
+        'hisat2',
+        'salmon',
+        'star',
+        'tetoolkit', #  21 feb 21 No resolvio el env.... Un poco de suerte?
+        'cufflinks',
+        # # Bioconduxctor envs
+        'bioconductor-fourcseq',
+        'bioconductor-deseq2',
+        # # Highrhoughput sequencing
+        'htseq',
+        # # HiC
+        'hicexplorer',
+        # 'hicexplorer=3.2',
+        'cooler',        
+        'hint',
+        'hicup',
+        'hic2cool',
+        'tadtool',
+        # # viz
+        'pygenometracks',
+        # # ncbi
+        'sra-tools',
+        # # Others
+        'bcftools',     # SNP calling
+        'stringtie',
+        'gromacs_mpi',
+              ]
+    
+    ### TODO --- agregar? crear una version modular
+    # rdock (en bioconda) > molecular docking small molecules against proteins and nuc ac
+    # ambertools (conda forge) >  conda-forge
+    base_cmd = '/home/anaconda/mambaforge/bin/mamba create -n {} -c bioconda -c conda-forge {} -y'
+    
+    for pkg in gen_pkg:
+        if '=' in pkg:
+            pk, version = pkg.split('=')
+            version = version.replace('.', '')
+            envname = pk + version + '-env'
+        else:
+            envname = pkg + '-env'
+        if envname not in env_info:
+            print('[INSTALLING]', envname)
+            # conditional for independent packages, lets try to avoid this
+            if 'hicexplorer' in envname:
+                pkgs = pkg + ' hic2cool'
+                cmd = base_cmd.format(envname, pkgs)
+            else:
+                cmd = base_cmd.format(envname, pkg)
+            run(cmd.split(), preexec_fn=demote(1015, 1015), env=myenv)
+        else:
+            print('[NOT INSTALLING]', envname, 'already installed!')
+            
 
 #########################################
 ## main
@@ -344,23 +525,34 @@ else:
 print('[INFO] Moving to anaconda home')
 os.chdir('/home/anaconda/')
 print('=====================')      
-download_miniconda()
+#download_miniconda()
+download_mambaforge()
 
-if not os.path.exists('/home/anaconda/miniconda3'):
-    print('[INFO] Installing miniconda. ')
-    install_miniconda()
+# if not os.path.exists('/home/anaconda/miniconda3'):
+#     print('[INFO] Installing miniconda. ')
+#     install_miniconda()
+# else:
+#     print('[INFO] Minocaonda already isntalled.')
+
+if not os.path.exists('/home/anaconda/mambaforge'):
+    print('[INFO] Installing mambaforge. ')
+    install_mambaforge()
 else:
-    print('[INFO] Minocaonda already isntalled.')
+    print('[INFO] Mambaforge already isntalled.')
 
 # os.chdir(repopath) # this was usefull using aditional scripts Now
 # all th code is here - TODO - Delete this coment
 print('[INFO] Updating anaconda and isntalling basic packages.')
-update_miniconda()
+#update_miniconda()
+update_mambaforge()
 
 print('[INFO] NEW packages.')
-install_conda_base()
+#install_conda_base()
+install_mambaforge_base()
 
 print('[INFO] virtual envs.')
-install_virtual_envs()
+#install_virtual_envs()
+install_virtual_envs_mamba()
+
 
 print('[END] All packages instaled')
