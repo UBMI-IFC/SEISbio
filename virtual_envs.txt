@@ -52,4 +52,5 @@ sra-tools
 bcftools
 stringtie
 gromacs_mpi
-
+# rdock (en bioconda) > molecular docking small molecules against proteins and nuc ac
+# ambertools (conda forge) >  conda-forge
