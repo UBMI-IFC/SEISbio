@@ -1,0 +1,55 @@
+# pipelines
+snakePipes
+# more general than general
+r-base
+# general use
+repeatmasker
+fastqc
+multiqc
+macs2
+trim-galore
+trimmomatic
+igv
+samtools
+bedtools
+meme
+homer
+deeptools
+picard
+kallisto
+# # genome assembly alignment
+abyss
+spades
+quast
+prokka
+bowtie2
+bwa
+velvet
+# # RNAseq specific
+hisat2
+salmon
+star
+tetoolkit
+cufflinks
+# # Bioconduxctor envs
+bioconductor-fourcseq
+bioconductor-deseq2
+# # Highrhoughput sequencing
+htseq
+# # HiC
+hicexplorer
+# hicexplorer=3.2
+cooler
+hint
+hicup
+hic2cool
+tadtool
+# # viz
+pygenometracks
+# # ncbi
+sra-tools
+# # Others
+bcftools
+stringtie
+gromacs_mpi
+
