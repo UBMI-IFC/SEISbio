@@ -1,3 +1,9 @@
+# Virtual environments to create
+# Each line must contain the name of only one package in conda-forge or bioconda
+# You can specify the version of the package to create the environment. Example:
+# hicexplorer=3.2
+#
+
 # pipelines
 snakePipes
 # more general than general
@@ -38,7 +44,7 @@ bioconductor-deseq2
 htseq
 # # HiC
 hicexplorer
-# hicexplorer=3.2
+
 cooler
 hint
 hicup
