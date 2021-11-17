@@ -32,7 +32,11 @@ def arguments():
     parser.add_argument('--debupgrade',
                         action='store_true', default=False,
                         help='If specified  UPDATE Debian/ubuntu system')
-    
+    parser.add_argument('-f', '--envfile', default='virtual_envs.txt',
+                        help=('Files that specifies the virtual environments'
+                              'to create in SEISbio instalation.'
+                              'Default=./virtual_envs.txt. You can read'
+                              'the file specification in ./virtual_envs.txt'))
     args = parser.parse_args()
     return args
 
@@ -188,7 +192,7 @@ def install_distribution_base(manager='mamba',
     run(cmd, preexec_fn=demote(1015, 1015), env=myenv)
 
 
-def install_virtual_envs(manager='mamba',
+def install_virtual_envs(pkg_list, manager='mamba',
                          distribution='mambaforge',
                          home='seisbio'):
     """Installing virtual environments for many bioinformatics programs from:
@@ -205,68 +209,8 @@ def install_virtual_envs(manager='mamba',
     myenv['HOME'] = home_path
     env_info = run([manager_path, 'info',  '--env'], stdout=PIPE)
     env_info = env_info.stdout.decode()
-    ############################################
-    # Pasar esto a un archivo de configuracion #
-    ############################################
-    ### TODO --- agregar? crear una version modular
-    gen_pkg = [
-        # pipelines
-        # 'snakePipes',
-        # more general than general
-        'r-base',
-        # general use
-        'repeatmasker',
-        'fastqc',
-        # 'multiqc',
-        # 'macs2',
-        # 'trim-galore',
-        # 'trimmomatic',
-        # 'igv',
-        # 'samtools',
-        # 'bedtools',
-        # 'meme',
-        # 'homer',
-        # 'deeptools',
-        # 'picard',
-        # 'kallisto',
-        # # # genome assembly alignment
-        # 'abyss',
-        # 'spades',
-        # 'quast',
-        # 'prokka',
-        # 'bowtie2',
-        # 'bwa',
-        # 'velvet',
-        # # # RNAseq specific
-        # 'hisat2',
-        # 'salmon',
-        # 'star',
-        # 'tetoolkit',  # 21 feb 21 No resolvio el env.... Un poco de suerte?
-        # 'cufflinks',
-        # # # Bioconduxctor envs
-        # 'bioconductor-fourcseq',
-        # 'bioconductor-deseq2',
-        # # # Highrhoughput sequencing
-        # 'htseq',
-        # # # HiC
-        # 'hicexplorer',
-        # # 'hicexplorer=3.2',
-        # 'cooler',
-        # 'hint',
-        # 'hicup',
-        # 'hic2cool',
-        # 'tadtool',
-        # # # viz
-        # 'pygenometracks',
-        # # # ncbi
-        # 'sra-tools',
-        # # # Others
-        # 'bcftools',     # SNP calling
-        # 'stringtie',
-        # 'gromacs_mpi',
-    ]
     base_cmd = manager_path + ' create -n {} -c bioconda -c conda-forge {} -y'
-    for pkg in gen_pkg:
+    for pkg in pkg_list:
         print(pkg)
         if '=' in pkg:
             pk, version = pkg.split('=')
@@ -291,6 +235,36 @@ def install_virtual_envs(manager='mamba',
         else:
             print(f'[NOT INSTALLING] {envname}:, already installed!')
 
+def read_env_file(fname):
+    """Returns a lsit with the packages to install as conda environments
+    
+    Parameters
+    ----------
+    fname : filename, str
+
+
+    Returns
+    -------
+    out : 
+
+    """
+    pkg_list = []
+    with open(fname) as inf:
+        for line in inf:
+            line = line.strip()
+            if line =='':
+                continue
+            elif line[0] == '#' :
+                continue
+            elements = line.split()
+            if len(elements) == 1:
+                # only one package per line -- assume existence ib bioconda or conda-foge?
+                pkg_list.append(elements[0])
+            else:
+                # TO DO
+                # Here put what to do if you want a special environmet
+                pass
+    return pkg_list
 
 def update_bashrc(home, distribution):
     """Update the /etc/bash.bashrc and backup the original one
@@ -380,7 +354,9 @@ def main():
                               )
     
     print('[INFO] virtual envs.')
-    install_virtual_envs(manager=manager,
+    env_list = read_env_file(args.envfile)
+    install_virtual_envs(env_list,
+                         manager=manager,
                          distribution=args.distribution,
                          home=args.home
                          )
