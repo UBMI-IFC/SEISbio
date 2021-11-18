@@ -59,7 +59,7 @@ def debian_install_bioinfo(upgrade=False):
     cmd_upgrade = ['apt', 'upgrade', '-y']
     # reading package lists
     basic_file = Path(__file__).parent.absolute()/'deb/basic_pkgs.txt'
-    bioinfo_file = Path(__file__).parent.absolute()/'deb/basic_pkgs.txt'
+    bioinfo_file = Path(__file__).parent.absolute()/'deb/bioinfo_pkgs.txt'
     #
     basic_pkgs = read_env_file(basic_file)
     bioinfo_pkgs = read_env_file(bioinfo_file)

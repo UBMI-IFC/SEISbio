@@ -14,7 +14,5 @@ seaview
 clustalo
 probalign
 proalign
-sra-toolkit
-ncbi-tools-bin
-ncbi-entrez-direct
+
 
