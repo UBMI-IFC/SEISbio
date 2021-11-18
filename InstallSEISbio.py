@@ -319,6 +319,7 @@ def main():
         print('[START] Installing system packages for Debian/Ubuntu.')
         debian_install_bioinfo(upgrade=args.debupgrade)
 
+    # creating seisbio user
     print(f'[INFO] Creating {args.home} user if not exists.')
     if not os.path.exists(f'/home/{args.home}'):
         print(f'[INFO] Creating {args.home} user and asking for a password.')
