@@ -18,6 +18,7 @@ import subprocess
 import argparse
 import re
 from subprocess import run, PIPE
+from pathlib import Path
 
 
 def arguments():
@@ -29,8 +30,12 @@ def arguments():
     parser.add_argument('--home', default='seisbio',
                         help='User and home directory to create for the distribution installation.'
                         'This will be created in /home/')
-    parser.add_argument('--debupgrade',
-                        action='store_true', default=False,
+    parser.add_argument('--debian', default=False, action='store_true',
+                        help='Install basic and bioinformatic packages from '
+                        'Debian/Ubuntu repositories. The lists of packages  '
+                        'are specified in the dev directory in SEISbio root '
+                        'directory.')
+    parser.add_argument('--debupgrade', action='store_true', default=False,
                         help='If specified  UPDATE Debian/ubuntu system')
     parser.add_argument('-f', '--envfile', default='virtual_envs.txt',
                         help=('Files that specifies the virtual environments'
@@ -52,28 +57,15 @@ def debian_install_bioinfo(upgrade=False):
     """
     cmd_update = ['apt', 'update']
     cmd_upgrade = ['apt', 'upgrade', '-y']
-    cmd_basic = ['apt', 'install', '-y',
-                 'emacs',
-                 'vim',
-                 'lm-sensors',
-                 'htop',
-                 'aptitude',
-                 # 'gimp', 'inkscape',   #for desktop
-                 ]
-    cmd_bioinfo = ['apt', 'install', '-y',
-                   'emboss',
-                   'ncbi-blast+',
-                   'hmmer',
-                   't-coffee',
-                   'muscle',
-                   'probcons',
-                   'phylip',
-                   'phyml',
-                   'raxml',
-                   'mrbayes',
-                   'seaview',
-                   'clustalo',
-                   ]
+    # reading package lists
+    basic_file = Path(__file__).parent.absolute()/'deb/basic_pkgs.txt'
+    bioinfo_file = Path(__file__).parent.absolute()/'deb/basic_pkgs.txt'
+    #
+    basic_pkgs = read_env_file(basic_file)
+    bioinfo_pkgs = read_env_file(bioinfo_file)
+    #
+    cmd_basic = ['apt', 'install', '-y'] + basic_pkgs
+    cmd_bioinfo = ['apt', 'install', '-y'] + bioinfo_pkgs
 
     if upgrade:
         print('[INFO] Updating and upgrading system (Debian/Ubuntu)')
@@ -122,6 +114,7 @@ to isntall.
     run(cmd, preexec_fn=demote(1015, 1015))
     filename = url.split('/')[-1]
     return filename
+
 
 def install_distribution(installer, distribution='mambaforge', home='seisbio'):
     """Downloads the latest installator from the scientific distribution
@@ -235,9 +228,10 @@ def install_virtual_envs(pkg_list, manager='mamba',
         else:
             print(f'[NOT INSTALLING] {envname}:, already installed!')
 
+
 def read_env_file(fname):
     """Returns a lsit with the packages to install as conda environments
-    
+
     Parameters
     ----------
     fname : filename, str
@@ -252,9 +246,9 @@ def read_env_file(fname):
     with open(fname) as inf:
         for line in inf:
             line = line.strip()
-            if line =='':
+            if line == '':
                 continue
-            elif line[0] == '#' :
+            elif line[0] == '#':
                 continue
             elements = line.split()
             if len(elements) == 1:
@@ -265,6 +259,7 @@ def read_env_file(fname):
                 # Here put what to do if you want a special environmet
                 pass
     return pkg_list
+
 
 def update_bashrc(home, distribution):
     """Update the /etc/bash.bashrc and backup the original one
@@ -279,7 +274,7 @@ def update_bashrc(home, distribution):
         msg = ("\n\n# --- Backup of /bash.bashrc created\n"
                "# --- by SEISbio installation\n")
         backuprc.write(msg)
-        
+
     # Get conda bashrc stringtie
     conda_re = re.compile('(# >>> conda initialize >>>.*'
                           '# <<< conda initialize <<<)',
@@ -307,16 +302,42 @@ def main():
     else:
         print(f'[WARN] Unrecognized distribution: {args.distribution}')
         exit()
-    print('[START] Installing system packages')
-    debian_install_bioinfo(upgrade=args.debupgrade)
-    print('f[INFO] Creating {args.home} user if not exists.')
+
+    # Env file
+    if args.envfile == 'virtual_envs.txt':
+        # default file
+        mypath = Path(__file__)
+        envfile = mypath.parent.absolute()/args.envfile
+        print('     ... from default file:')
+        print(f'     ... {envfile}')
+    else:
+        envfile = Path().absolute()/args.envfile
+        print('     ... from file:')
+        print(f'     ... {envfile}')
+
+    if args.debian:
+        print('[START] Installing system packages for Debian/Ubuntu.')
+        debian_install_bioinfo(upgrade=args.debupgrade)
+
+    print(f'[INFO] Creating {args.home} user if not exists.')
     if not os.path.exists(f'/home/{args.home}'):
         print(f'[INFO] Creating {args.home} user and asking for a password.')
         print('=====================')
         # adduser only works this way in Debian distrso
         # ArchLinux : install adduser-deb from AUR
-        cmd_create = f"""adduser --shell /bin/bash --uid 1015 --gecos '' {args.home}""".split()
+        # cmd_create = f"""adduser --shell /bin/bash --uid 1015 --gecos '' {args.home}""".split()
+        # subprocess.run(cmd_create)
+        cmd_create = f"useradd -s /bin/bash -u 1015 -m {args.home}".split()
         subprocess.run(cmd_create)
+        # password
+        cmd_passwd = ['passwd', args.home]
+        subprocess.run(cmd_passwd)
+        # permissions
+        cmd_chmod = ['chmod', '-R', 'go+r', f'/home/{args.home}']
+        subprocess.run(cmd_chmod)
+        cmd_chmod = ['chmod', 'go+x', f'/home/{args.home}']
+        subprocess.run(cmd_chmod)
+
         print('=====================')
         print(f'[INFO] {args.home} user created')
         print('=====================')
@@ -326,8 +347,8 @@ def main():
         print(f'   $ sudo userdel -r {args.home}')
         # TO DO : ask if ending program or continue with risk
         print('[END] exit program doing nothing!')
-        # exit()n(distri
-    
+        # exit()
+
     print(f'[INFO] Moving to {args.home} home')
     os.chdir(f'/home/{args.home}/')
     print('=====================')
@@ -352,9 +373,10 @@ def main():
                               distribution=args.distribution,
                               home=args.home
                               )
-    
+
     print('[INFO] virtual envs.')
-    env_list = read_env_file(args.envfile)
+    # envfile defintion at the begining of main()b
+    env_list = read_env_file(envfile)
     install_virtual_envs(env_list,
                          manager=manager,
                          distribution=args.distribution,

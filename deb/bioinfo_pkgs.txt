@@ -1,0 +1,20 @@
+# Bioinformatics packages to install from debian/ubuntu repositories
+# This file does not accept tailing comentaries
+emboss
+ncbi-blast+
+hmmer
+t-coffee
+muscle
+probcons
+phylip
+phyml
+raxml
+mrbayes
+seaview
+clustalo
+probalign
+proalign
+sra-toolkit
+ncbi-tools-bin
+ncbi-entrez-direct
+
