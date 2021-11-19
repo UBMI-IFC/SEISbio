@@ -46,6 +46,8 @@ def arguments():
                               'to create in SEISbio instalation.'
                               'Default=./virtual_envs.txt. You can read'
                               'the file specification in ./virtual_envs.txt'))
+    # TODO(acph) Select instalation path
+    # TODO(acph) Select local or systemwide isntalation
     args = parser.parse_args()
     return args
 
@@ -79,7 +81,7 @@ def debian_install_bioinfo(upgrade=False):
     print('[INFO] Installing helping packages (Debian/Ubuntu)')
     run(cmd_basic)
 
-    print('''[INFO] Installing Bioinformatic programs from repositories 
+    print('''[INFO] Installing Bioinformatic programs from repositories
              (Debian/Ubuntu)''')
     run(cmd_bioinfo)
 
@@ -87,6 +89,9 @@ def debian_install_bioinfo(upgrade=False):
 def demote(user_uid, user_gid):
     """Pass the function 'set_ids' to preexec_fn, rather than just calling
     setuid and setgid. This will change the ids for that subprocess only"""
+    user_uid = int(user_uid)
+    user_gid = int(user_gid)
+
     def set_ids():
         os.setgid(user_gid)
         os.setuid(user_uid)
@@ -113,11 +118,13 @@ to isntall.
     distribution -- str (default 'mambaforge')
              'mambaforge' | 'miniconda'
     """
-    urls = {'mambaforge': 'https://github.com/conda-forge/miniforge/releases/latest/download/Mambaforge-Linux-x86_64.sh',
-            'miniconda': 'https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh'}
+    urls = {'mambaforge':
+            'https://github.com/conda-forge/miniforge/releases/latest/download/Mambaforge-Linux-x86_64.sh',
+            'miniconda':
+            'https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh'}
     url = urls[distribution]
     cmd = ['wget', '-N', url]
-    run(cmd, preexec_fn=demote(uid, uid))
+    check_output(cmd, preexec_fn=demote(uid, uid), stderr=PIPE)
     filename = url.split('/')[-1]
     return filename
 
@@ -132,15 +139,15 @@ to isntall.
     """
     myenv = os.environ.copy()
     myenv['HOME'] = f'/home/{home}'
-    run(['echo', '$HOME'])
+    # run(['echo', '$HOME'])
     # se podra ejecutar con sudo esta parte?
     # INSTALL
     cmd = ['bash', f'/home/{home}/{installer}', '-b',
            '-p', f'/home/{home}/{distribution}']
-    run(cmd, preexec_fn=demote(uid, uid), env=myenv)
+    check_output(cmd, preexec_fn=demote(uid, uid), env=myenv)
     # init conda, [WARN]
     cmd_init = [f'/home/{home}/{distribution}/bin/conda', 'init']
-    run(cmd_init, preexec_fn=demote(uid, uid), env=myenv)
+    check_output(cmd_init, preexec_fn=demote(uid, uid), env=myenv)
 
 
 def update_distribution(manager='mamba', distribution='mambaforge',
@@ -155,8 +162,10 @@ def update_distribution(manager='mamba', distribution='mambaforge',
            '-p',
            f'/home/{home}/{distribution}',
            '-y',
-           '--all']
-    run(cmd, preexec_fn=demote(uid, uid), env=myenv)
+           '--all',
+           '-q']
+    check_output(cmd, preexec_fn=demote(uid, uid), env=myenv,
+                 stderr=PIPE, timeout=600)
 
 
 def install_distribution_base(manager='mamba',
@@ -172,6 +181,7 @@ def install_distribution_base(manager='mamba',
            '-p',
            f'/home/{home}/{distribution}',
            '-y',
+           '-q',
            'numpy',
            'scipy',
            'matplotlib',
@@ -188,7 +198,8 @@ def install_distribution_base(manager='mamba',
            'keras',
            'jupyterlab',
            ]
-    run(cmd, preexec_fn=demote(uid, uid), env=myenv)
+    check_output(cmd, preexec_fn=demote(uid, uid), env=myenv,
+                 stderr=PIPE, timeout=600)
 
 
 def install_virtual_envs(pkg_list, manager='mamba',
@@ -206,19 +217,19 @@ def install_virtual_envs(pkg_list, manager='mamba',
     os.chdir(home_path)
     myenv = os.environ.copy()
     myenv['HOME'] = home_path
-    env_info = run([manager_path, 'info',  '--env'], stdout=PIPE)
-    env_info = env_info.stdout.decode()
-    base_cmd = manager_path + ' create -n {} -c bioconda -c conda-forge {} -y'
+    env_info = check_output([manager_path, 'info', '--env']).decode()
+    # env_info = run([manager_path, 'info',  '--env'], stdout=PIPE)
+    # env_info = env_info.stdout.decode()
+    base_cmd = manager_path + ' create -n {} -c bioconda -c conda-forge {} -y -q'
     for pkg in pkg_list:
-        print(pkg)
         if '=' in pkg:
-            pk, version = pkg.split('=')
+            pkname, version = pkg.split('=')
             version = version.replace('.', '')
-            envname = pk + version + '-env'
+            envname = pkname + version + '-env'
         else:
             envname = pkg + '-env'
         if envname not in env_info:
-            print('[INSTALLING]', envname)
+            print('[INSTALLING]', 'Environmet for', envname, 'package')
             # ###
             # CONDITIONALs for independent packages cases, lets try to avoid this
             if 'hicexplorer' in envname:
@@ -228,7 +239,8 @@ def install_virtual_envs(pkg_list, manager='mamba',
                 cmd = base_cmd.format('snakePipes -c mpi-ie', 'snakePipes')
             else:
                 cmd = base_cmd.format(envname, pkg)
-            run(cmd.split(), preexec_fn=demote(uid, uid), env=myenv)
+            check_output(cmd.split(), preexec_fn=demote(uid, uid), env=myenv,
+                         stderr=PIPE, timeout=600)
             # CONDITIONALs END
             # ###
         else:
@@ -245,7 +257,7 @@ def read_env_file(fname):
 
     Returns
     -------
-    out : 
+    out :
 
     """
     pkg_list = []
@@ -258,10 +270,11 @@ def read_env_file(fname):
                 continue
             elements = line.split()
             if len(elements) == 1:
-                # only one package per line -- assume existence ib bioconda or conda-foge?
+                # only one package per line --
+                # assume existence ib bioconda or conda-foge?
                 pkg_list.append(elements[0])
             else:
-                # TO DO
+                # TODO
                 # Here put what to do if you want a special environmet
                 pass
     return pkg_list
@@ -271,11 +284,11 @@ def update_bashrc(home, distribution):
     """Update the /etc/bash.bashrc and backup the original one
 
     Keyword Arguments:
-    home         -- 
-    distribution -- 
+    home         --
+    distribution --
     """
     # backup bashrc
-    run(['cp', '/etc/bash.bashrc', '/etc/bash.bashrc.backup'])
+    check_output(['cp', '/etc/bash.bashrc', '/etc/bash.bashrc.backup'])
     with open('/etc/bash.bashrc.backup', 'a') as backuprc:
         msg = ("\n\n# --- Backup of /bash.bashrc created\n"
                "# --- by SEISbio installation\n")
@@ -299,7 +312,7 @@ def update_bashrc(home, distribution):
 
 
 def main():
-
+    # TODO (acph) ask if superuser
     args = arguments()
     if args.distribution == 'mambaforge':
         manager = 'mamba'
@@ -337,6 +350,8 @@ def main():
         cmd_create = f"useradd -s /bin/bash -u {args.homeid} -m {args.home}".split()
         check_output(cmd_create)
         # password
+        print(f'[INFO] Configuring {args.home} user.')
+        print(f'[INPUT] Enter {args.home} user password:')
         cmd_passwd = ['passwd', args.home]
         check_output(cmd_passwd)
         # permissions
@@ -352,13 +367,21 @@ def main():
         print(f'[WARN] {args.home} user already exists!!!')
         print('[INFO] Consider to delete this user')
         print(f'   $ sudo userdel -r {args.home}')
-        # TO DO : ask if ending program or continue with risk
-        print('[END] exit program doing nothing!')
-        # exit()
+        answer = input("Do you want to continue? y/[n]: ")
+        if answer == 'y':
+            print('[INFO] Continue instalation')
+        elif answer == 'n':
+            print('[END] exit program doing nothing more!')
+            exit()
+        else:
+            print('[END] Invalid answer: exit!')
+            exit()
 
     print(f'[INFO] Moving to {args.home} home')
     os.chdir(f'/home/{args.home}/')
     print('=====================')
+    print(f'[INFO] Downloading {args.distribution} distribution')
+
     installerfilename = donwload_distribution(distribution=args.distribution,
                                               uid=args.homeid)
 
