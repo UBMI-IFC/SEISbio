@@ -5,8 +5,7 @@
 #
 
 # pipelines
-snakePipes
+# snakePipes
 # more general than general
 r-base
 
-proteinortho

@@ -14,10 +14,11 @@
 """General Instalation of SEISbio """
 
 import os
-import subprocess
 import argparse
 import re
-from subprocess import run, PIPE
+from subprocess import run
+from subprocess import PIPE
+from subprocess import check_output
 from pathlib import Path
 
 
@@ -28,8 +29,11 @@ def arguments():
                         choices=['mambaforge', 'miniconda'],
                         help='Select scientific software distribution.')
     parser.add_argument('--home', default='seisbio',
-                        help='User and home directory to create for the distribution installation.'
+                        help='User and home directory to create for the '
+                        'distribution installation.'
                         'This will be created in /home/')
+    parser.add_argument('--homeid', default=1015,
+                        help='Distribution user UID and GUID')
     parser.add_argument('--debian', default=False, action='store_true',
                         help='Install basic and bioinformatic packages from '
                         'Debian/Ubuntu repositories. The lists of packages  '
@@ -90,16 +94,18 @@ def demote(user_uid, user_gid):
 
 
 def check_id_as_user():
-    """Run the command 'id' in a subprocess as user 1000,
+    """Run the command 'id' in a subprocess as user 1010,
     return the result
+
+    THIS FUNCTION IS NOT USED
 
     https://gist.github.com/sweenzor/1685717"""
 
     cmd = ['id']
-    return subprocess.check_output(cmd, preexec_fn=demote(1015, 1015))
+    return check_output(cmd, preexec_fn=demote(1015, 1015))
 
 
-def donwload_distribution(distribution='mambaforge'):
+def donwload_distribution(distribution='mambaforge', uid='1015'):
     """Downloads the latest installator from the scientific distribution
 to isntall.
 
@@ -111,12 +117,12 @@ to isntall.
             'miniconda': 'https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh'}
     url = urls[distribution]
     cmd = ['wget', '-N', url]
-    run(cmd, preexec_fn=demote(1015, 1015))
+    run(cmd, preexec_fn=demote(uid, uid))
     filename = url.split('/')[-1]
     return filename
 
 
-def install_distribution(installer, distribution='mambaforge', home='seisbio'):
+def install_distribution(installer, distribution='mambaforge', home='seisbio', uid=1015):
     """Downloads the latest installator from the scientific distribution
 to isntall.
 
@@ -131,14 +137,14 @@ to isntall.
     # INSTALL
     cmd = ['bash', f'/home/{home}/{installer}', '-b',
            '-p', f'/home/{home}/{distribution}']
-    run(cmd, preexec_fn=demote(1015, 1015), env=myenv)
+    run(cmd, preexec_fn=demote(uid, uid), env=myenv)
     # init conda, [WARN]
     cmd_init = [f'/home/{home}/{distribution}/bin/conda', 'init']
-    run(cmd_init, preexec_fn=demote(1015, 1015), env=myenv)
+    run(cmd_init, preexec_fn=demote(uid, uid), env=myenv)
 
 
 def update_distribution(manager='mamba', distribution='mambaforge',
-                        home='seisbio'):
+                        home='seisbio', uid=1015):
     """Update miniconda installation
     """
     os.chdir(f'/home/{home}/')
@@ -150,12 +156,12 @@ def update_distribution(manager='mamba', distribution='mambaforge',
            f'/home/{home}/{distribution}',
            '-y',
            '--all']
-    run(cmd, preexec_fn=demote(1015, 1015), env=myenv)
+    run(cmd, preexec_fn=demote(uid, uid), env=myenv)
 
 
 def install_distribution_base(manager='mamba',
                               distribution='mambaforge',
-                              home='seisbio'):
+                              home='seisbio', uid=1015):
     """Completing miniconda base environment with scientific packages"""
     os.chdir(f'/home/{home}/')
     myenv = os.environ.copy()
@@ -182,12 +188,12 @@ def install_distribution_base(manager='mamba',
            'keras',
            'jupyterlab',
            ]
-    run(cmd, preexec_fn=demote(1015, 1015), env=myenv)
+    run(cmd, preexec_fn=demote(uid, uid), env=myenv)
 
 
 def install_virtual_envs(pkg_list, manager='mamba',
                          distribution='mambaforge',
-                         home='seisbio'):
+                         home='seisbio', uid=1015):
     """Installing virtual environments for many bioinformatics programs from:
     - conda-forge
     - bioconda
@@ -222,7 +228,7 @@ def install_virtual_envs(pkg_list, manager='mamba',
                 cmd = base_cmd.format('snakePipes -c mpi-ie', 'snakePipes')
             else:
                 cmd = base_cmd.format(envname, pkg)
-            run(cmd.split(), preexec_fn=demote(1015, 1015), env=myenv)
+            run(cmd.split(), preexec_fn=demote(uid, uid), env=myenv)
             # CONDITIONALs END
             # ###
         else:
@@ -327,17 +333,17 @@ def main():
         # adduser only works this way in Debian distrso
         # ArchLinux : install adduser-deb from AUR
         # cmd_create = f"""adduser --shell /bin/bash --uid 1015 --gecos '' {args.home}""".split()
-        # subprocess.run(cmd_create)
-        cmd_create = f"useradd -s /bin/bash -u 1015 -m {args.home}".split()
-        subprocess.run(cmd_create)
+        # run(cmd_create)
+        cmd_create = f"useradd -s /bin/bash -u {args.homeid} -m {args.home}".split()
+        check_output(cmd_create)
         # password
         cmd_passwd = ['passwd', args.home]
-        subprocess.run(cmd_passwd)
+        check_output(cmd_passwd)
         # permissions
         cmd_chmod = ['chmod', '-R', 'go+r', f'/home/{args.home}']
-        subprocess.run(cmd_chmod)
+        check_output(cmd_chmod)
         cmd_chmod = ['chmod', 'go+x', f'/home/{args.home}']
-        subprocess.run(cmd_chmod)
+        check_output(cmd_chmod)
 
         print('=====================')
         print(f'[INFO] {args.home} user created')
@@ -353,12 +359,13 @@ def main():
     print(f'[INFO] Moving to {args.home} home')
     os.chdir(f'/home/{args.home}/')
     print('=====================')
-    installerfilename = donwload_distribution(distribution=args.distribution)
+    installerfilename = donwload_distribution(distribution=args.distribution,
+                                              uid=args.homeid)
 
     if not os.path.exists(f'/home/{args.home}/{args.distribution}'):
         print(f'[INFO] Installing {args.distribution}.')
         install_distribution(installerfilename, distribution=args.distribution,
-                             home=args.home)
+                             home=args.home, uid=args.homeid)
         print('[INFO] Updating /etc/bash.bashrc')
         update_bashrc(args.home, args.distribution)
     else:
@@ -367,12 +374,14 @@ def main():
     print('[INFO] Updating anaconda and isntalling basic packages.')
     update_distribution(manager=manager,
                         distribution=args.distribution,
-                        home=args.home
+                        home=args.home,
+                        uid=args.homeid
                         )
     print('[INFO] Base scientific packages.')
     install_distribution_base(manager=manager,
                               distribution=args.distribution,
-                              home=args.home
+                              home=args.home,
+                              uid=args.homeid
                               )
 
     print('[INFO] virtual envs.')
@@ -381,7 +390,8 @@ def main():
     install_virtual_envs(env_list,
                          manager=manager,
                          distribution=args.distribution,
-                         home=args.home
+                         home=args.home,
+                         uid=args.homeid
                          )
     print('[END] All packages instaled')
 
