@@ -391,21 +391,45 @@ def main():
                              home=args.home, uid=args.homeid)
         print('[INFO] Updating /etc/bash.bashrc')
         update_bashrc(args.home, args.distribution)
+        installed = False
     else:
+        installed = True
         print(f'[INFO] {args.distribution} already isntalled.')
-
-    print('[INFO] Updating anaconda and isntalling basic packages.')
-    update_distribution(manager=manager,
-                        distribution=args.distribution,
-                        home=args.home,
-                        uid=args.homeid
-                        )
-    print('[INFO] Base scientific packages.')
-    install_distribution_base(manager=manager,
-                              distribution=args.distribution,
-                              home=args.home,
-                              uid=args.homeid
-                              )
+        
+    if installed:
+        answer_installed = input('Do you want to update base {args.distribution}'
+                                 ' installation? y/[n]')
+        if answer_installed == 'y':
+                print('[INFO] Updating anaconda and isntalling basic packages.')
+                update_distribution(manager=manager,
+                                    distribution=args.distribution,
+                                    home=args.home,
+                                    uid=args.homeid
+                                    )
+                print('[INFO] Base scientific packages.')
+                install_distribution_base(manager=manager,
+                                          distribution=args.distribution,
+                                          home=args.home,
+                                          uid=args.homeid
+                                          )
+        elif answer_installed == 'n':
+            print('[INFO]  Continue with envs installation!')
+        else:
+            print('[END] Invalid answer: exit!')
+            exit()
+    else:
+        print('[INFO] Updating anaconda and isntalling basic packages.')
+        update_distribution(manager=manager,
+                            distribution=args.distribution,
+                            home=args.home,
+                            uid=args.homeid
+                            )
+        print('[INFO] Base scientific packages.')
+        install_distribution_base(manager=manager,
+                                  distribution=args.distribution,
+                                  home=args.home,
+                                  uid=args.homeid
+                                  )
 
     print('[INFO] virtual envs.')
     # envfile defintion at the begining of main()b

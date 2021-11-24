@@ -1,0 +1,7 @@
+# Programs for structural computational biology
+# apbs=3 in conda forge only version 1.5
+gromacs
+ambertools=21
+openbabel=3
+acpype
+autodock-vina
