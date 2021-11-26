@@ -19,6 +19,8 @@ import re
 from subprocess import run
 from subprocess import PIPE
 from subprocess import check_output
+from subprocess import TimeoutExpired
+from subprocess import CalledProcessError
 from pathlib import Path
 
 

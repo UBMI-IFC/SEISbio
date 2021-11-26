@@ -1,0 +1,5 @@
+- Carpeta independiente para la lista de programas instalados para el sistema base
+
+- Carpeta independiente para poner archivos de especificación de ambientes más
+complejos
+
