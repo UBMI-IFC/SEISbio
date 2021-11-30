@@ -14,6 +14,7 @@
 """General Instalation of SEISbio """
 
 import os
+import sys
 import argparse
 import re
 from subprocess import run
@@ -22,10 +23,19 @@ from subprocess import check_output
 from subprocess import TimeoutExpired
 from subprocess import CalledProcessError
 from pathlib import Path
+# TODO (acph) add time tolerance to subprocess functoins
+# TODO (acph) ... and catch TimeoutExpired
+# TODO (acph) catch CalledProcessError ? it is necessary
+#      In particular when the programm tries to do actions
+#      as other user
+# TODO (acph) add verbose for all functions 0.0
+# TODO (acph) Complete documentation
+# TODO (acph) Encapsulate isntall function or create one
+#      for local and one for system wide isntallation
 
 
 def arguments():
-    """"""
+    """Argument parser function"""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('-d', '--distribution', default='mambaforge',
                         choices=['mambaforge', 'miniconda'],
@@ -48,6 +58,9 @@ def arguments():
                               'to create in SEISbio instalation.'
                               'Default=./virtual_envs.txt. You can read'
                               'the file specification in ./virtual_envs.txt'))
+    parser.add_argument('--local', default=False, action='store_true',
+                        help='Prefers a local installation instead of a system'
+                        ' wide isntallation. Does not needs root access.')
     # TODO(acph) Select instalation path
     # TODO(acph) Select local or systemwide isntalation
     args = parser.parse_args()
@@ -56,7 +69,7 @@ def arguments():
 
 def debian_install_bioinfo(upgrade=False):
     """Installing bioinfo basic packages from Debian/Ubuntu repositories.
-    WARN: Only for debian/ubuntu
+    WARNING: Only for debian/ubuntu
 
     1. Update
     2. Upgrade
@@ -112,7 +125,7 @@ def check_id_as_user():
     return check_output(cmd, preexec_fn=demote(1015, 1015))
 
 
-def donwload_distribution(distribution='mambaforge', uid='1015'):
+def donwload_distribution(distribution='mambaforge', uid='1015', home='seisbio'):
     """Downloads the latest installator from the scientific distribution
 to isntall.
 
@@ -125,7 +138,7 @@ to isntall.
             'miniconda':
             'https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh'}
     url = urls[distribution]
-    cmd = ['wget', '-N', url]
+    cmd = ['wget', '-N', url, '-P', '/home/'+home]
     check_output(cmd, preexec_fn=demote(uid, uid), stderr=PIPE)
     filename = url.split('/')[-1]
     return filename
@@ -288,15 +301,17 @@ def update_bashrc(home, distribution):
     Keyword Arguments:
     home         --
     distribution --
+    bashrc       -- str, filepath
+                    Bash rc file to modify
     """
-    # backup bashrc
+    # backup bashrcn
     check_output(['cp', '/etc/bash.bashrc', '/etc/bash.bashrc.backup'])
     with open('/etc/bash.bashrc.backup', 'a') as backuprc:
         msg = ("\n\n# --- Backup of /bash.bashrc created\n"
                "# --- by SEISbio installation\n")
         backuprc.write(msg)
 
-    # Get conda bashrc stringtie
+    # Get conda bashrc stringt RE
     conda_re = re.compile('(# >>> conda initialize >>>.*'
                           '# <<< conda initialize <<<)',
                           re.DOTALL)
@@ -322,8 +337,11 @@ def main():
         manager = 'conda'
     else:
         print(f'[WARN] Unrecognized distribution: {args.distribution}')
-        exit()
-
+        sys.exit()
+    # user info
+    user = os.getlogin()
+    uid = os.getuid()
+    guid = os.getgid()
     # Env file
     if args.envfile == 'virtual_envs.txt':
         # default file
@@ -336,6 +354,26 @@ def main():
         print('     ... from file:')
         print(f'     ... {envfile}')
 
+    # Isntalling
+    if args.local:
+        # TODO (acph) sub menus or warning of ignoring arguments
+        print('[INFO] Installing systemm locally')
+        print(f'[INFO] in  user {user} (uid: {uid}, gid:{guid})')
+        args.home = user
+        args.homeid = uid
+        install(args)
+        print('------ but no yet --------')
+        print('------ working on it -----')
+        sys.exit()
+    else:
+        if uid != 0:
+            print('[INFO] You need to be root to install SEIS system wide'
+                  ' or use --local flag for local installation.')
+            print(f'       You are {user}!')
+            print('[END] Ending program.')
+            sys.exit()
+
+    print('============ Installing as root')
     if args.debian:
         print('[START] Installing system packages for Debian/Ubuntu.')
         debian_install_bioinfo(upgrade=args.debupgrade)
@@ -371,7 +409,7 @@ def main():
         print(f'   $ sudo userdel -r {args.home}')
         answer = input("Do you want to continue? y/[n]: ")
         if answer == 'y':
-            print('[INFO] Continue instalation')
+            print('[INFO] Continue installation')
         elif answer == 'n':
             print('[END] exit program doing nothing more!')
             exit()
@@ -385,7 +423,8 @@ def main():
     print(f'[INFO] Downloading {args.distribution} distribution')
 
     installerfilename = donwload_distribution(distribution=args.distribution,
-                                              uid=args.homeid)
+                                              uid=args.homeid,
+                                              home=args.home)
 
     if not os.path.exists(f'/home/{args.home}/{args.distribution}'):
         print(f'[INFO] Installing {args.distribution}.')
@@ -397,23 +436,23 @@ def main():
     else:
         installed = True
         print(f'[INFO] {args.distribution} already isntalled.')
-        
+
     if installed:
-        answer_installed = input('Do you want to update base {args.distribution}'
+        answer_installed = input(f'Do you want to update base {args.distribution}'
                                  ' installation? y/[n]')
         if answer_installed == 'y':
-                print('[INFO] Updating anaconda and isntalling basic packages.')
-                update_distribution(manager=manager,
-                                    distribution=args.distribution,
-                                    home=args.home,
-                                    uid=args.homeid
-                                    )
-                print('[INFO] Base scientific packages.')
-                install_distribution_base(manager=manager,
-                                          distribution=args.distribution,
-                                          home=args.home,
-                                          uid=args.homeid
-                                          )
+            print('[INFO] Updating anaconda and isntalling basic packages.')
+            update_distribution(manager=manager,
+                                distribution=args.distribution,
+                                home=args.home,
+                                uid=args.homeid
+                                )
+            print('[INFO] Installing base scientific packages.')
+            install_distribution_base(manager=manager,
+                                      distribution=args.distribution,
+                                      home=args.home,
+                                      uid=args.homeid
+                                      )
         elif answer_installed == 'n':
             print('[INFO]  Continue with envs installation!')
         else:
@@ -426,7 +465,91 @@ def main():
                             home=args.home,
                             uid=args.homeid
                             )
-        print('[INFO] Base scientific packages.')
+        print('[INFO] Installing base scientific packages.')
+        install_distribution_base(manager=manager,
+                                  distribution=args.distribution,
+                                  home=args.home,
+                                  uid=args.homeid
+                                  )
+
+    print('[INFO] virtual envs.')
+    # envfile defintion at the begining of main()b
+    env_list = read_env_file(envfile)
+    install_virtual_envs(env_list,
+                         manager=manager,
+                         distribution=args.distribution,
+                         home=args.home,
+                         uid=args.homeid
+                         )
+    print('[END] All packages instaled')
+
+
+def install(args):
+    # Distribution
+    if args.distribution == 'mambaforge':
+        manager = 'mamba'
+    elif args.distribution == 'miniconda':
+        manager = 'conda'
+    else:
+        print(f'[WARN] Unrecognized distribution: {args.distribution}')
+        sys.exit()
+    # envfile
+    if args.envfile == 'virtual_envs.txt':
+        # default file
+        mypath = Path(__file__)
+        envfile = mypath.parent.absolute()/args.envfile
+        print('     ... from default file:')
+        print(f'     ... {envfile}')
+    else:
+        envfile = Path().absolute()/args.envfile
+        print('     ... from file:')
+        print(f'     ... {envfile}')
+
+    print(f'[INFO] Downloading {args.distribution} distribution.')
+    installerfilename = donwload_distribution(distribution=args.distribution,
+                                              uid=args.homeid,
+                                              home=args.home)
+
+    if not os.path.exists(f'/home/{args.home}/{args.distribution}'):
+        print(f'[INFO] Installing {args.distribution}.')
+        install_distribution(installerfilename, distribution=args.distribution,
+                             home=args.home, uid=args.homeid)
+        # print('[INFO] Updating /etc/bash.bashrc')
+        # update_bashrc(args.home, args.distribution)
+        installed = False
+    else:
+        installed = True
+        print(f'[INFO] {args.distribution} already installed.')
+
+    if installed:
+        answer_installed = input('Do you want to update base {args.distribution}'
+                                 ' installation? y/[n]')
+        if answer_installed == 'y':
+            print('[INFO] Updating anaconda and isntalling basic packages.')
+            update_distribution(manager=manager,
+                                distribution=args.distribution,
+                                home=args.home,
+                                uid=args.homeid
+                                )
+            print('[INFO] Installing scientific packages.')
+            install_distribution_base(manager=manager,
+                                      distribution=args.distribution,
+                                      home=args.home,
+                                      uid=args.homeid
+                                      )
+        elif answer_installed == 'n':
+            print('[INFO]  Continue with envs installation!')
+        else:
+            print('[END] Invalid answer: exit!')
+            exit()
+    else:
+        print('[INFO] Updating anaconda and isntalling basic packages.')
+        update_distribution(manager=manager,
+                            distribution=args.distribution,
+                            home=args.home,
+                            uid=args.homeid
+                            )
+        print('[INFO] Installing base scientific packages.')
         install_distribution_base(manager=manager,
                                   distribution=args.distribution,
                                   home=args.home,
