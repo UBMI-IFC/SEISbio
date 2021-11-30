@@ -32,6 +32,8 @@ from pathlib import Path
 # TODO (acph) Complete documentation
 # TODO (acph) Encapsulate isntall function or create one
 #      for local and one for system wide isntallation
+# TODO (Expand markdown)
+# TODO (acph) create external scripts for installing some programas
 
 
 def arguments():
