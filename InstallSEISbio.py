@@ -17,6 +17,7 @@ import os
 import sys
 import argparse
 import re
+import getpass
 from subprocess import run
 from subprocess import PIPE
 from subprocess import check_output
@@ -341,7 +342,8 @@ def main():
         print(f'[WARN] Unrecognized distribution: {args.distribution}')
         sys.exit()
     # user info
-    user = os.getlogin()
+    # user = os.getlogin()    # Error in some systems, glibc related?
+    user = getpass.getuser()
     uid = os.getuid()
     guid = os.getgid()
     # Env file
