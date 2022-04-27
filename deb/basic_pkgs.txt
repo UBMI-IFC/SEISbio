@@ -12,10 +12,15 @@ bc
 rsync
 zsh
 tldr
+openssh-server
+xrdp
 
 # editors
 vim
 emacs
+
+# Provisional
+monitorix
 
 # GUI
 #
