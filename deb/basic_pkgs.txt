@@ -3,25 +3,31 @@
 # system utilities
 build-essential
 aptitude
-lm-sensors
-htop
-nmon
 tree
-byobu
 bc
 rsync
-zsh
 tldr
+
+# shells
+zsh
+tclsh
+fish
+
+# remote access
 openssh-server
 xrdp
+byobu
+
+# monitoring
+htop
+lm-sensors
+nmon
+cockpit
 
 # editors
 vim
 emacs
 
-# Provisional
-monitorix
-
-# GUI
+# GUI - Programs for install graphic mode servers/workstations
 #
 #
