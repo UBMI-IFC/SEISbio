@@ -1,12 +1,15 @@
 # Basic packages installed from Debian/ubuntu repositories
 # This file does not accept tailing comentaries
-# system utilities
+
+# system utilities/programs
 build-essential
+cmake
 aptitude
 tree
 bc
 rsync
 tldr
+default-jre
 
 # shells
 zsh
