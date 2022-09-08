@@ -21,8 +21,14 @@ openssh-server
 xrdp
 byobu
 
+# Searching
+fd-find
+fzf
+ripgrep
+
 # monitoring
 htop
+# bashtop
 lm-sensors
 nmon
 cockpit
