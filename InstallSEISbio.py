@@ -45,10 +45,10 @@ def arguments():
                         help='Select scientific software distribution.')
     parser.add_argument('--home', default='seisbio',
                         help='User and home directory to create for the '
-                        'distribution installation.'
+                        'distribution installation. [seisbio]'
                         'This will be created in /home/')
     parser.add_argument('--homeid', default=1015,
-                        help='Distribution user UID and GUID')
+                        help='Distribution user UID and GUID. [1015]')
     parser.add_argument('--debian', default=False, action='store_true',
                         help='Install basic and bioinformatic packages from '
                         'Debian/Ubuntu repositories. The lists of packages  '
