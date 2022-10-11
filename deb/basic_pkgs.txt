@@ -37,6 +37,10 @@ cockpit
 vim
 emacs
 
+# Extra utility software
+toilet
+figlet
+
 # GUI - Programs for install graphic mode servers/workstations
 #
 #
