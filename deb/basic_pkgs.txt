@@ -21,6 +21,7 @@ openssh-server
 xrdp
 byobu
 nfs-client
+screen
 
 # Searching
 fd-find

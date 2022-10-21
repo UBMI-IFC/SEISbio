@@ -213,6 +213,7 @@ def install_distribution_base(manager='mamba',
            'jupyter',
            'spyder',
            'orange3',
+           'tensorflow',
            'keras',
            'jupyterlab',
            ]
