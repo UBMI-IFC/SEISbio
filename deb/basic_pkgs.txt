@@ -9,7 +9,10 @@ tree
 bc
 rsync
 tldr
+wget
+curl
 default-jre
+ranger
 
 # shells
 zsh
@@ -34,15 +37,21 @@ htop
 lm-sensors
 nmon
 cockpit
+iotop
+smartmontools
+lsof
 
 # editors
 vim
 emacs
 
-# Extra utility software
+# Extra utility software, because yes!
 toilet
 figlet
+cowsay
+lolcat
+dialog
+xfonts-utils
 
 # GUI - Programs for install graphic mode servers/workstations
-#
 #
