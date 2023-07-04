@@ -1,0 +1,24 @@
+# Basic packages installed from AUR
+# This file does not accept tailing comentaries
+
+xrdp
+toilet
+
+
+# Bioinformatics packages to install
+
+emboss
+blast+-bin
+hmmer
+t-coffee
+muscle
+phylip
+phyml
+# probcons
+raxml
+mrbayes
+seaview
+clustal-omega
+probalign
+proalign
+treeviewx

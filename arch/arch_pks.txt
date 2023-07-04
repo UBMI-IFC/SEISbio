@@ -1,58 +1,55 @@
-# Basic packages installed from Debian/ubuntu repositories
+# Basic packages installed from ArchLinux repositories
 # This file does not accept tailing comentaries
 
 # system utilities/programs
-build-essential
+base-devel
 cmake
-aptitude
 tree
 bc
 rsync
 tldr
 wget
 curl
-default-jre
 ranger
+# Current jre
+jre-openjdk
 
 # shells
 zsh
-tclsh
 fish
 
 # remote access
-openssh-server
-xrdp
+openssh
 byobu
-nfs-client
+nfs-utils
 screen
 
 # Searching
-fd-find
+fd
 fzf
 ripgrep
 
 # monitoring
 htop
 # bashtop
-lm-sensors
+lm_sensors
 nmon
+btop
 cockpit
 iotop
 smartmontools
 lsof
 
 # editors
-# vim
-neovim
+vim
 emacs
 
 # Extra utility software, because yes!
-toilet
 figlet
 cowsay
 lolcat
 dialog
-
+neofetch
 
 # GUI - Programs for install graphic mode servers/workstations
 #

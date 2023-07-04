@@ -6,8 +6,9 @@
 
 # pipelines
 snakePipes
+
 # more general than general
-r-base
+# r-base
 # general use
 repeatmasker
 fastqc
@@ -15,7 +16,7 @@ multiqc
 macs2
 trim-galore
 trimmomatic
-igv
+# igv
 samtools
 bedtools
 meme
@@ -23,44 +24,50 @@ homer
 deeptools
 picard
 kallisto
+
 # # genome assembly alignment
-abyss
-spades
-quast
-prokka
-bowtie2
-bwa
-velvet
+# abyss
+# spades
+# quast
+# prokka
+# bowtie2
+# bwa
+# velvet
+
 # # RNAseq specific
 hisat2
 salmon
 star
 tetoolkit
 cufflinks
+
 # # Bioconduxctor envs
-bioconductor-fourcseq
 bioconductor-deseq2
+
 # # Highrhoughput sequencing
 htseq
+
 # # HiC
 hicexplorer
-
 cooler
 hint
 hicup
 hic2cool
 tadtool
+
 # # viz
 pygenometracks
+
 # # ncbi
+datasets
 sra-tools
+
 # # Others
 bcftools
 stringtie
-gromacs_mpi
+# gromacs_mpi
 proteinortho
 
-prueba prueba prueba
 
 # rdock (en bioconda) > molecular docking small molecules against proteins and nuc ac
 # ambertools (conda forge) >  conda-forge

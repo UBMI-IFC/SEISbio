@@ -69,6 +69,8 @@ def arguments():
     args = parser.parse_args()
     return args
 
+## TODO Arch
+## --noconfirm
 
 def debian_install_bioinfo(upgrade=False):
     """Installing bioinfo basic packages from Debian/Ubuntu repositories.
@@ -211,11 +213,20 @@ def install_distribution_base(manager='mamba',
            'scikit-image',
            'networkx',
            'jupyter',
-           'spyder',
-           'orange3',
+           # These two are graphical interfase programs
+           #'spyder',
+           #'orange3',
            'tensorflow',
            'keras',
            'jupyterlab',
+           # TODO Separeate by protgramming language ??
+           # R packages
+           'r-base',
+           'r-tidyverse',
+           'r-irkernel',
+           'jupyter-lsp',
+           'jupyter-lsp-r',
+           'jupyterlab-lsp'
            ]
     check_output(cmd, preexec_fn=demote(uid, uid), env=myenv,
                  stderr=PIPE, timeout=600)
