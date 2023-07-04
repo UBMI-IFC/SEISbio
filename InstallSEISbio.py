@@ -219,14 +219,16 @@ def install_distribution_base(manager='mamba',
            'tensorflow',
            'keras',
            'jupyterlab',
+           'jupyter-lsp',
+           'jupyterlab-lsp',
+           'jupyter-lsp-python',
            # TODO Separeate by protgramming language ??
            # R packages
            'r-base',
            'r-tidyverse',
            'r-irkernel',
-           'jupyter-lsp',
            'jupyter-lsp-r',
-           'jupyterlab-lsp'
+           'radian'
            ]
     check_output(cmd, preexec_fn=demote(uid, uid), env=myenv,
                  stderr=PIPE, timeout=600)
