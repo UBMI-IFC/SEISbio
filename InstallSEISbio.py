@@ -40,8 +40,8 @@ from pathlib import Path
 def arguments():
     """Argument parser function"""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('-d', '--distribution', default='mambaforge',
-                        choices=['mambaforge', 'miniconda'],
+    parser.add_argument('-d', '--distribution', default='miniforge',
+                        choices=['miniforge', 'miniconda'],
                         help='Select scientific software distribution.')
     parser.add_argument('--home', default='seisbio',
                         help='User and home directory to create for the '
@@ -130,16 +130,16 @@ def check_id_as_user():
     return check_output(cmd, preexec_fn=demote(1015, 1015))
 
 
-def donwload_distribution(distribution='mambaforge', uid='1015', home='seisbio'):
+def donwload_distribution(distribution='miniforge', uid='1015', home='seisbio'):
     """Downloads the latest installator from the scientific distribution
 to isntall.
 
     Keyword Arguments:
-    distribution -- str (default 'mambaforge')
-             'mambaforge' | 'miniconda'
+    distribution -- str (default 'miniforge')
+             'miniaforge' | 'miniconda'
     """
-    urls = {'mambaforge':
-            'https://github.com/conda-forge/miniforge/releases/latest/download/Mambaforge-Linux-x86_64.sh',
+    urls = {'miniforge':
+            'https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh',
             'miniconda':
             'https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh'}
     url = urls[distribution]
@@ -149,13 +149,13 @@ to isntall.
     return filename
 
 
-def install_distribution(installer, distribution='mambaforge', home='seisbio', uid=1015):
+def install_distribution(installer, distribution='miniforge', home='seisbio', uid=1015):
     """Downloads the latest installator from the scientific distribution
 to isntall.
 
     Keyword Arguments:
-    distribution -- str (default 'mambaforge')
-             'mambaforge' | 'miniconda'
+    distribution -- str (default 'miniforge')
+             'miniforge' | 'miniconda'
     """
     myenv = os.environ.copy()
     myenv['HOME'] = f'/home/{home}'
@@ -170,7 +170,7 @@ to isntall.
     check_output(cmd_init, preexec_fn=demote(uid, uid), env=myenv)
 
 
-def update_distribution(manager='mamba', distribution='mambaforge',
+def update_distribution(manager='mamba', distribution='miniforge',
                         home='seisbio', uid=1015):
     """Update miniconda installation
     """
@@ -189,7 +189,7 @@ def update_distribution(manager='mamba', distribution='mambaforge',
 
 
 def install_distribution_base(manager='mamba',
-                              distribution='mambaforge',
+                              distribution='miniforge',
                               home='seisbio', uid=1015):
     """Completing miniconda base environment with scientific packages"""
     os.chdir(f'/home/{home}/')
@@ -235,7 +235,7 @@ def install_distribution_base(manager='mamba',
 
 
 def install_virtual_envs(pkg_list, manager='mamba',
-                         distribution='mambaforge',
+                         distribution='miniforge',
                          home='seisbio', uid=1015):
     """Installing virtual environments for many bioinformatics programs from:
     - conda-forge
@@ -348,7 +348,7 @@ def update_bashrc(home, distribution):
 def main():
     # TODO (acph) ask if superuser
     args = arguments()
-    if args.distribution == 'mambaforge':
+    if args.distribution == 'miniforge':
         manager = 'mamba'
     elif args.distribution == 'miniconda':
         manager = 'conda'
@@ -504,7 +504,7 @@ def main():
 
 def install(args):
     # Distribution
-    if args.distribution == 'mambaforge':
+    if args.distribution == 'miniforge':
         manager = 'mamba'
     elif args.distribution == 'miniconda':
         manager = 'conda'
