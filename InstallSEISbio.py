@@ -249,7 +249,9 @@ def install_virtual_envs(pkg_list, manager='mamba',
     os.chdir(home_path)
     myenv = os.environ.copy()
     myenv['HOME'] = home_path
-    env_info = check_output([manager_path, 'info', '--env']).decode()
+    env_info = check_output([manager_path, 'env', 'list'],
+                            preexec_fn=demote(uid, uid),
+                            env=myenv).decode()
     # env_info = run([manager_path, 'info',  '--env'], stdout=PIPE)
     # env_info = env_info.stdout.decode()
     base_cmd = manager_path + ' create -n {} -c bioconda -c conda-forge {} -y -q'
