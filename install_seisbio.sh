@@ -166,7 +166,7 @@ download_distribution() {
         url="$urls_miniconda"
     fi
 
-    echo "[INFO] Downloading $distribution installer from $url"
+    echo "[INFO] Downloading $distribution installer from $url" >&2
     # Use sudo -u to download as the target user
     sudo -u "#$uid" wget -N "$url" -P "/home/$home" || { echo "[ERROR] Failed to download $distribution."; exit 1; }
     echo "$url" | awk -F'/' '{print $NF}' # Return filename
