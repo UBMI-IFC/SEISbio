@@ -20,6 +20,7 @@ HOME_ID=1015
 DEBIAN_INSTALL=false
 DEB_UPGRADE=false
 ENV_FILE="virtual_envs.txt"
+YML_FILE=""
 LOCAL_INSTALL=false
 
 # Function to display usage
@@ -37,6 +38,7 @@ usage() {
     echo "  --debupgrade                              If specified, UPDATE Debian/Ubuntu system."
     echo "  -f, --envfile <file>                      File that specifies the virtual environments to create in SEISbio installation."
     echo "                                            [default: ./virtual_envs.txt]. You can read the file specification in ./virtual_envs.txt"
+    echo " --y, --yml, --yaml <file>    	      YAML file (environment.yml format) that specifies a conda environment to install."
     echo "  --local                                   Prefers a local installation instead of a system wide installation. Does not need root access."
     echo "  -h, --help                                Display this help message and exit."
     exit 1
@@ -67,6 +69,10 @@ while [[ "$#" -gt 0 ]]; do
             ENV_FILE="$2"
             shift
             ;;
+        -y|--yml|--yaml)
+            YML_FILE="$2"
+	    shift
+	    ;;
         --local)
             LOCAL_INSTALL=true
             ;;
@@ -98,6 +104,35 @@ fi
 CURRENT_USER=$(whoami)
 CURRENT_UID=$(id -u)
 CURRENT_GID=$(id -g)
+
+# Check if YAML file is specified and delegate to Python script
+if [[ -n "$YML_FILE" ]]; then
+    echo "[INFO] YAML file specified: $YML_FILE"
+    echo "[INFO] Delegating to Python script for YAML support..."
+    
+    # Build Python command with appropriate arguments
+    PYTHON_CMD="python3 $(dirname "$0")/InstallSEISbio.py"
+    PYTHON_CMD="$PYTHON_CMD --distribution $DISTRIBUTION"
+    PYTHON_CMD="$PYTHON_CMD --home $HOME_DIR"
+    PYTHON_CMD="$PYTHON_CMD --homeid $HOME_ID"
+    PYTHON_CMD="$PYTHON_CMD --yml $YML_FILE"
+    
+    if [[ "$DEBIAN_INSTALL" == "true" ]]; then
+        PYTHON_CMD="$PYTHON_CMD --debian"
+    fi
+    
+    if [[ "$DEB_UPGRADE" == "true" ]]; then
+        PYTHON_CMD="$PYTHON_CMD --debupgrade"
+    fi
+    
+    if [[ "$LOCAL_INSTALL" == "true" ]]; then
+        PYTHON_CMD="$PYTHON_CMD --local"
+    fi
+    
+    echo "[INFO] Executing: $PYTHON_CMD"
+    eval "$PYTHON_CMD"
+    exit $?
+fi
 
 # Resolve envfile path
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"

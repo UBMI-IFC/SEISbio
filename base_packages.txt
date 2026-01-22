@@ -1,0 +1,79 @@
+# Base scientific packages for SEISbio
+# This file specifies the packages to install in the base conda/mamba environment
+# 
+# INSTRUCTIONS:
+# - Uncomment (remove #) lines for packages you want to install
+# - Comment (add #) or delete lines for packages you don't need
+# - Lines starting with # are ignored
+# - Empty lines are ignored
+#
+# WARNING: Some packages install many dependencies and can require several GB of disk space
+# Consider your storage and needs before uncommenting large packages like tensorflow or R
+
+# ============================================
+# BASIC SCIENTIFIC COMPUTING (Recommended)
+# ============================================
+numpy
+scipy
+matplotlib
+pandas
+statsmodels
+seaborn
+
+# ============================================
+# BIOINFORMATICS
+# ============================================
+biopython
+
+# ============================================
+# MACHINE LEARNING (Large packages - ~2-3 GB)
+# ============================================
+# Uncomment if you need machine learning capabilities
+# scikit-learn
+# scikit-image
+
+# Deep Learning (Very large - ~4-5 GB with dependencies)
+# tensorflow
+# keras
+
+# ============================================
+# NETWORK ANALYSIS
+# ============================================
+networkx
+
+# ============================================
+# JUPYTER ENVIRONMENT (Recommended)
+# ============================================
+jupyter
+jupyterlab
+jupyter-lsp
+jupyterlab-lsp
+jupyter-lsp-python
+
+# ============================================
+# R SUPPORT (Large installation - ~3-4 GB)
+# ============================================
+# Uncomment if you need R programming support
+# r-base
+# r-tidyverse
+# r-irkernel
+# jupyter-lsp-r
+# radian
+
+# ============================================
+# DATA VISUALIZATION (Optional)
+# ============================================
+# plotly
+# bokeh
+# altair
+
+# ============================================
+# ADDITIONAL TOOLS (Optional)
+# ============================================
+# ipython
+# sympy
+# numba
+# cython
+# h5py
+# pytables
+
