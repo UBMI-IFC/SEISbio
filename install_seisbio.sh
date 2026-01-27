@@ -465,7 +465,7 @@ main() {
                 echo "[INFO] Updating anaconda and installing basic packages."
                 update_distribution "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID"
                 echo "[INFO] Installing scientific packages."
-                install_distribution_base "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID"
+                install_distribution_base "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID" "$BASE_PACKAGES_FILE"
             elif [[ "$ANSWER_INSTALLED" == "n" ]]; then
                 echo "[INFO] Continue with envs installation!"
             else
@@ -476,7 +476,7 @@ main() {
             echo "[INFO] Updating anaconda and installing basic packages."
             update_distribution "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID"
             echo "[INFO] Installing base scientific packages."
-            install_distribution_base "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID"
+            install_distribution_base "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID" "$BASE_PACKAGES_FILE"
         fi
 
         echo "[INFO] virtual envs."
@@ -561,7 +561,7 @@ main() {
             echo "[INFO] Updating anaconda and installing basic packages."
             update_distribution "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID"
             echo "[INFO] Installing base scientific packages."
-            install_distribution_base "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID"
+            install_distribution_base "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID" "$BASE_PACKAGES_FILE"
         elif [[ "$ANSWER_INSTALLED" == "n" ]]; then
             echo "[INFO] Continue with envs installation!"
         else
@@ -572,7 +572,7 @@ main() {
         echo "[INFO] Updating anaconda and installing basic packages."
         update_distribution "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID"
         echo "[INFO] Installing base scientific packages."
-        install_distribution_base "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID"
+        install_distribution_base "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID" "$BASE_PACKAGES_FILE"
     fi
 
     echo "[INFO] virtual envs."
