@@ -464,8 +464,12 @@ main() {
             if [[ "$ANSWER_INSTALLED" == "y" ]]; then
                 echo "[INFO] Updating anaconda and installing basic packages."
                 update_distribution "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID"
-                echo "[INFO] Installing scientific packages."
-                install_distribution_base "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID" "$BASE_PACKAGES_FILE"
+                if [[ "$SKIP_BASE_PACKAGES" == "false" ]]; then
+                    echo "[INFO] Installing scientific packages."
+                    install_distribution_base "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID" "$BASE_PACKAGES_FILE"
+                else
+                    echo "[INFO] Skipping base packages installation (--skip-base specified)."
+                fi
             elif [[ "$ANSWER_INSTALLED" == "n" ]]; then
                 echo "[INFO] Continue with envs installation!"
             else
@@ -475,8 +479,12 @@ main() {
         else
             echo "[INFO] Updating anaconda and installing basic packages."
             update_distribution "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID"
-            echo "[INFO] Installing base scientific packages."
-            install_distribution_base "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID" "$BASE_PACKAGES_FILE"
+            if [[ "$SKIP_BASE_PACKAGES" == "false" ]]; then
+                echo "[INFO] Installing base scientific packages."
+                install_distribution_base "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID" "$BASE_PACKAGES_FILE"
+            else
+                echo "[INFO] Skipping base packages installation (--skip-base specified)."
+            fi
         fi
 
         echo "[INFO] virtual envs."
@@ -560,8 +568,12 @@ main() {
         if [[ "$ANSWER_INSTALLED" == "y" ]]; then
             echo "[INFO] Updating anaconda and installing basic packages."
             update_distribution "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID"
-            echo "[INFO] Installing base scientific packages."
-            install_distribution_base "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID" "$BASE_PACKAGES_FILE"
+            if [[ "$SKIP_BASE_PACKAGES" == "false" ]]; then
+                echo "[INFO] Installing base scientific packages."
+                install_distribution_base "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID" "$BASE_PACKAGES_FILE"
+            else
+                echo "[INFO] Skipping base packages installation (--skip-base specified)."
+            fi
         elif [[ "$ANSWER_INSTALLED" == "n" ]]; then
             echo "[INFO] Continue with envs installation!"
         else
@@ -571,8 +583,12 @@ main() {
     else
         echo "[INFO] Updating anaconda and installing basic packages."
         update_distribution "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID"
-        echo "[INFO] Installing base scientific packages."
-        install_distribution_base "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID" "$BASE_PACKAGES_FILE"
+        if [[ "$SKIP_BASE_PACKAGES" == "false" ]]; then
+            echo "[INFO] Installing base scientific packages."
+            install_distribution_base "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID" "$BASE_PACKAGES_FILE"
+        else
+            echo "[INFO] Skipping base packages installation (--skip-base specified)."
+        fi
     fi
 
     echo "[INFO] virtual envs."
