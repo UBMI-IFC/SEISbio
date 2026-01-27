@@ -19,8 +19,10 @@ HOME_DIR="seisbio"
 HOME_ID=1015
 DEBIAN_INSTALL=false
 DEB_UPGRADE=false
-ENV_FILE="virtual_envs.txt"
+ENV_FILE="envs/virtual_envs.txt"
 YML_FILE=""
+BASE_PACKAGES_FILE="base/base_packages.txt"
+SKIP_BASE_PACKAGES=false
 LOCAL_INSTALL=false
 
 # Function to display usage
@@ -37,8 +39,11 @@ usage() {
     echo "                                            The lists of packages are specified in the dev directory in SEISbio root directory."
     echo "  --debupgrade                              If specified, UPDATE Debian/Ubuntu system."
     echo "  -f, --envfile <file>                      File that specifies the virtual environments to create in SEISbio installation."
-    echo "                                            [default: ./virtual_envs.txt]. You can read the file specification in ./virtual_envs.txt"
-    echo " --y, --yml, --yaml <file>    	      YAML file (environment.yml format) that specifies a conda environment to install."
+    echo "                                            [default: ./envs/virtual_envs.txt]. You can read the file specification in ./envs/virtual_envs.txt"
+    echo " -y, --yml, --yaml <file>    	      YAML file (environment.yml format) that specifies a conda environment to install."
+    echo "  -b, --base-packages <file>                File that specifies the base scientific packages to install."
+    echo "                                            [default: ./base/base_packages.txt]"
+    echo "  --skip-base                               Skip installation of base scientific packages."
     echo "  --local                                   Prefers a local installation instead of a system wide installation. Does not need root access."
     echo "  -h, --help                                Display this help message and exit."
     exit 1
@@ -73,6 +78,13 @@ while [[ "$#" -gt 0 ]]; do
             YML_FILE="$2"
 	    shift
 	    ;;
+        -b|--base-packages)
+            BASE_PACKAGES_FILE="$2"
+            shift
+            ;;
+        --skip-base)
+            SKIP_BASE_PACKAGES=true
+            ;;
         --local)
             LOCAL_INSTALL=true
             ;;
@@ -136,7 +148,7 @@ fi
 
 # Resolve envfile path
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-if [[ "$ENV_FILE" == "virtual_envs.txt" ]]; then
+if [[ "$ENV_FILE" == "envs/virtual_envs.txt" ]]; then
     ENV_FILE_PATH="$SCRIPT_DIR/$ENV_FILE"
     echo "     ... from default file:"
     echo "     ... $ENV_FILE_PATH"
@@ -237,17 +249,36 @@ update_distribution() {
 
 # Function to install base scientific packages
 install_distribution_base() {
-    local manager="$1"
+	local manager="$1"
     local distribution="$2"
     local home="$3"
     local uid="$4"
+    local packages_file="$5"
+
+    # Resolve relative path if needed
+    if [[ "$packages_file" != /* ]]; then
+        packages_file="$SCRIPT_DIR/$packages_file"
+    fi
+
+    if [[ ! -f "$packages_file" ]]; then
+        echo "[ERROR] Base packages file not found: $packages_file"
+        return 1
+    fi
+
+    echo "[INFO] Reading base packages from: $packages_file"
+    local packages=$(read_env_file "$packages_file")
+    
+    if [[ -z "$packages" ]]; then
+        echo "[WARN] No packages found in $packages_file (all commented out or empty)"
+        echo "[INFO] Skipping base packages installation."
+        return 0
+    fi
 
     echo "[INFO] Installing base scientific packages into $distribution base environment"
-    # Packages list
-    local packages="numpy scipy matplotlib pandas statsmodels seaborn biopython scikit-learn scikit-image networkx jupyter tensorflow keras jupyterlab jupyter-lsp jupyterlab-lsp jupyter-lsp-python r-base r-tidyverse r-irkernel jupyter-lsp-r radian"
+    echo "[INFO] Packages to install: $packages"
 
     # Run install as the target user
-    sudo -u "#$uid" "/home/$home/$distribution/bin/$manager" install -p "/home/$home/$distribution" -y -q $packages || { echo "[ERROR] Failed to install base packages."; exit 1; }
+    sudo -u "#$uid" "/home/$home/$distribution/bin/$manager" install -p "/home/$home/$distribution" -y -q $packages || { echo "[ERROR] Failed to install base packages."; return 1; }    
 }
 
 # Function to install virtual environments
@@ -320,8 +351,93 @@ update_bashrc() {
     echo -e "\n\n# --- Added by SEISbio\n$conda_text" | sudo tee -a /etc/bash.bashrc > /dev/null
 }
 
+# Function to verify input files before starting installation
+verify_input_files() {
+    local errors=0
+    
+    echo "[INFO] Verifying input files..."
+    
+    # Verify ENV_FILE if not empty
+    if [[ -n "$ENV_FILE" && "$ENV_FILE" != "" ]]; then
+        if [[ ! -f "$ENV_FILE_PATH" ]]; then
+            echo "[ERROR] Environment file not found: $ENV_FILE_PATH"
+            errors=$((errors + 1))
+        else
+            echo "[OK] Environment file found: $ENV_FILE_PATH"
+        fi
+    fi
+    
+    # Verify BASE_PACKAGES_FILE if not skipping base packages
+    if [[ "$SKIP_BASE_PACKAGES" == "false" ]]; then
+        local base_pkg_path="$BASE_PACKAGES_FILE"
+        # If relative path, prepend SCRIPT_DIR
+        if [[ "$BASE_PACKAGES_FILE" != /* ]]; then
+            base_pkg_path="$SCRIPT_DIR/$BASE_PACKAGES_FILE"
+        fi
+        
+        if [[ ! -f "$base_pkg_path" ]]; then
+            echo "[ERROR] Base packages file not found: $base_pkg_path"
+            errors=$((errors + 1))
+        else
+            echo "[OK] Base packages file found: $base_pkg_path"
+        fi
+    else
+        echo "[INFO] Skipping base packages verification (--skip-base specified)"
+    fi
+    
+    # Verify YML_FILE if specified
+    if [[ -n "$YML_FILE" ]]; then
+        local yml_path="$YML_FILE"
+        # If relative path, use current directory
+        if [[ "$YML_FILE" != /* ]]; then
+            yml_path="$(pwd)/$YML_FILE"
+        fi
+        
+        if [[ ! -f "$yml_path" ]]; then
+            echo "[ERROR] YAML file not found: $yml_path"
+            errors=$((errors + 1))
+        else
+            echo "[OK] YAML file found: $yml_path"
+        fi
+    fi
+    
+    # Verify Debian package files if --debian specified
+    if [[ "$DEBIAN_INSTALL" == "true" ]]; then
+        local basic_file="$SCRIPT_DIR/deb/basic_pkgs.txt"
+        local bioinfo_file="$SCRIPT_DIR/deb/bioinfo_pkgs.txt"
+        
+        if [[ ! -f "$basic_file" ]]; then
+            echo "[ERROR] Debian basic packages file not found: $basic_file"
+            errors=$((errors + 1))
+        else
+            echo "[OK] Debian basic packages file found: $basic_file"
+        fi
+        
+        if [[ ! -f "$bioinfo_file" ]]; then
+            echo "[ERROR] Debian bioinfo packages file not found: $bioinfo_file"
+            errors=$((errors + 1))
+        else
+            echo "[OK] Debian bioinfo packages file found: $bioinfo_file"
+        fi
+    fi
+    
+    # Exit if any errors were found
+    if [[ $errors -gt 0 ]]; then
+        echo ""
+        echo "[FATAL] Found $errors error(s) in input files verification."
+        echo "[EXIT] Please fix the errors and try again."
+        exit 1
+    fi
+    
+    echo "[OK] All input files verified successfully."
+    echo ""
+}
+
 # Main logic
 main() {
+    # Verify all input files before starting
+    verify_input_files
+    
     if [[ "$LOCAL_INSTALL" == "true" ]]; then
         echo "[INFO] Installing system locally"
         echo "[INFO] in user $CURRENT_USER (uid: $CURRENT_UID, gid: $CURRENT_GID)"
