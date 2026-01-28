@@ -339,7 +339,7 @@ update_bashrc() {
     echo -e "\n\n# --- Backup of /bash.bashrc created\n# --- by SEISbio installation" | sudo tee -a /etc/bash.bashrc.backup > /dev/null
 
     echo "[INFO] Extracting conda initialization script from /home/$home/.bashrc"
-    local conda_text=$(sudo -u "#$HOME_ID" cat "/home/$home/.bashrc" | sed -n '/# >>> conda initialize >>>/,/# <<< conda initialize <<<p> {p; /# <<< conda initialize <<<p> q}')
+    local conda_text=$(sudo -u "#$HOME_ID" cat "/home/$home/.bashrc" | sed -n '/# >>> conda initialize >>>/,/# <<< conda initialize <<</p')
 
     if [[ -z "$conda_text" ]]; then
         echo "[WARN] Something is wrong with /home/$home/.bashrc file! Could not find conda initialization block."
