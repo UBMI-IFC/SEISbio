@@ -8,5 +8,15 @@ if [[ "$(pwd)" != "$SEISBIO_HOME" ]]; then
 
     echo "[INFO] Abriendo sesión como seisbio..."
     exec sudo -i -u seisbio
+else
+    echo "[INFO] Verificando instalación de Apptainer..."
+    if ! command -v apptainer &> /dev/null; then
+        echo "[INFO] Instalando Apptainer..."
+        sudo apt update
+        sudo apt install -y apptainer
+        echo "[INFO] Apptainer instalado correctamente"
+    else
+        echo "[INFO] Apptainer ya está instalado"
+    fi
 fi
 
