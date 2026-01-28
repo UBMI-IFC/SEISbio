@@ -58,9 +58,8 @@ if [[ "$(whoami)" != "seisbio" ]]; then
 fi
 
 # Carpeta de destino para los env descargados que después serán contenedores
-mkdir -p ambientes 
-
-# Obtener lista de los env (no incluye base) 
+mkdir -p ambientes
+mkdir -p ymls
 
 # Obtener lista de los env (no incluye base)
 if [[ -n "$SELECTED_ENV" ]]; then
@@ -82,9 +81,9 @@ fi
 for ENV_NAME in $ENVS; do
 	echo "Cargando entorno: $ENV_NAME"
 	
-	# Exportar .yml del entorno
-	echo "Exportando .yml: "
-	conda env export -n $ENV_NAME > ambientes/${ENV_NAME}_environment.yml
+	# Exportar .yml del entorno a carpeta ymls
+	echo "Exportando .yml a ymls/: "
+	conda env export -n $ENV_NAME > ymls/${ENV_NAME}_environment.yml
 
 	# Creando archivo .def
 	echo "=== Creando ==="
@@ -96,7 +95,7 @@ From: continuumio/miniconda3
 	Contenedor Apptainer con entorno conda "${ENV_NAME}"
 
 %files
-	${ENV_NAME}_environment.yml /opt/environment.yml
+	../ymls/${ENV_NAME}_environment.yml /opt/environment.yml
 
 %post 
 	echo "Creando entorno conda"
