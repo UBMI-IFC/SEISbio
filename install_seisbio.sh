@@ -278,8 +278,7 @@ install_distribution_base() {
     echo "[INFO] Packages to install: $packages"
 
      # Run install as the target user with login shell
-    sudo -i -u "$home" bash -c "cd ~ && $manager install -y -q $packages" || { echo "[ERROR] Failed to install base packages."; return 1; }    
-  
+    sudo -i -u "$home" bash -c "~/$distribution/bin/$manager install -y -q $packages" || { echo "[ERROR] Failed to install base packages."; return 1; }    
 }
 
 # Function to install virtual environments
@@ -323,8 +322,8 @@ install_virtual_envs() {
             fi
 
             # Use sudo -i -u to run in a login shell with proper conda initialization
-            sudo -i -u "$home" bash -c "$manager create -n $envname $channels $pkgs_to_install -y -q" || { echo "[ERROR] Failed to create $envname."; continue; }
-        else
+	    sudo -i -u "$home" bash -c "~/$distribution/bin/$manager create -n $envname $channels $pkgs_to_install -y -q" || { echo "[ERROR] Failed to create $envname."; continue; }
+    else
             echo "[NOT INSTALLING] $envname: already installed!"
         fi
     done
