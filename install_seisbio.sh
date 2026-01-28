@@ -243,8 +243,8 @@ update_distribution() {
     local uid="$4"
 
     echo "[INFO] Updating $distribution using $manager"
-    # Run update as the target user
-    sudo -u "#$uid" "/home/$home/$distribution/bin/$manager" update -p "/home/$home/$distribution" -y --all -q || { echo "[ERROR] Failed to update $distribution."; exit 1; }
+    # Run update as the target user with login shell
+    sudo -i -u "$home" bash -c "cd ~ && $manager update -y --all -q" || { echo "[ERROR] Failed to update $distribution."; exit 1; }
 }
 
 # Function to install base scientific packages
@@ -277,8 +277,9 @@ install_distribution_base() {
     echo "[INFO] Installing base scientific packages into $distribution base environment"
     echo "[INFO] Packages to install: $packages"
 
-    # Run install as the target user
-    sudo -u "#$uid" "/home/$home/$distribution/bin/$manager" install -p "/home/$home/$distribution" -y -q $packages || { echo "[ERROR] Failed to install base packages."; return 1; }    
+     # Run install as the target user with login shell
+    sudo -i -u "$home" bash -c "cd ~ && $manager install -y -q $packages" || { echo "[ERROR] Failed to install base packages."; return 1; }    
+  
 }
 
 # Function to install virtual environments
