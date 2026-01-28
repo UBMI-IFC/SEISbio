@@ -233,6 +233,9 @@ install_distribution() {
     echo "[INFO] Initializing conda for $distribution"
     # Initialize conda as the target user
     sudo -u "#$uid" "/home/$home/$distribution/bin/conda" init || { echo "[ERROR] Failed to initialize conda."; exit 1; }
+    
+    echo "[INFO] Disabling automatic conda base activation"
+    sudo -u "#$uid" "/home/$home/$distribution/bin/conda" config --set auto_activate_base false || { echo "[ERROR] Failed to disable auto_activate_base."; exit 1; }
 }
 
 # Function to update distribution
