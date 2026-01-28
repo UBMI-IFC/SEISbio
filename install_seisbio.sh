@@ -526,7 +526,12 @@ main() {
         sudo chmod -R go+r "/home/$HOME_DIR" || { echo "[ERROR] Failed to set permissions for $HOME_DIR."; exit 1; }
         sudo chmod go+x "/home/$HOME_DIR" || { echo "[ERROR] Failed to set permissions for $HOME_DIR."; exit 1; }
 
-        echo "====================="
+        # Configure sudo access for apptainer
+        echo "[INFO] Configuring sudo access for apptainer"
+        sudo bash -c "echo '$HOME_DIR ALL=(ALL) NOPASSWD: /usr/bin/apptainer' > /etc/sudoers.d/$HOME_DIR"
+        sudo chmod 440 "/etc/sudoers.d/$HOME_DIR"
+
+	echo "====================="
         echo "[INFO] $HOME_DIR user created"
         echo "====================="
     else
