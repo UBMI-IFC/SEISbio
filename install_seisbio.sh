@@ -243,8 +243,8 @@ update_distribution() {
     local uid="$4"
 
     echo "[INFO] Updating $distribution using $manager"
-    # Run update as the target user with login shell
-    sudo -i -u "$home" bash -c "cd ~ && $manager update -y --all -q" || { echo "[ERROR] Failed to update $distribution."; exit 1; }
+    # Run update as the target user with login shell using full path
+    sudo -i -u "$home" bash -c "~/$distribution/bin/$manager update -y --all -q" || { echo "[ERROR] Failed to update $distribution."; exit 1; }
 }
 
 # Function to install base scientific packages
