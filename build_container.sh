@@ -1,7 +1,13 @@
 #!/bin/bash
 
 # Script para construir todos los contenedores .sif desde los archivos .def
-# Usa sudo apptainer para cada construcción
+# REQUIERE sudo para ejecutar apptainer build
+
+if [ "$EUID" -ne 0 ]; then
+    echo "[ERROR] Este script debe ejecutarse con sudo" 
+    echo "Uso: sudo ./build_container.sh"
+    exit 1
+fi
 
 cd ambientes || exit 1
 
@@ -14,7 +20,7 @@ for DEF_FILE in *.def; do
         SIF_FILE="${ENV_NAME}.sif"
         
         echo "Construyendo ${SIF_FILE} desde ${DEF_FILE}..."
-        sudo apptainer build ${SIF_FILE} ${DEF_FILE}
+        apptainer build ${SIF_FILE} ${DEF_FILE}
         
         if [ $? -eq 0 ]; then
             echo "  ✓ ${SIF_FILE} creado exitosamente"
