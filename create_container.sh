@@ -30,25 +30,25 @@ if [[ ! -x "$CONDA" ]]; then
 	exit 1
 fi
 
-echo "[INFO] Usando conda:  $($CONDA --version)"
+echo "[INFO] Using conda:  $($CONDA --version)"
 
-# Valores por defecto
+# Default values
 SELECTED_ENV=""
 
-# Función para mostrar uso
+# Function to display usage
 usage() {
-    echo "Uso: $0 [OPCIONES]"
-    echo "Crea archivos .def para contenedores Apptainer desde entornos conda"
+    echo "Usage: $0 [OPTIONS]"
+    echo "Creates .def files for Apptainer containers from conda environments"
     echo ""
-    echo "Opciones:"
-    echo "  -e, --env <nombre>    Procesar solo el entorno especificado"
-    echo "  -h, --help            Mostrar este mensaje de ayuda"
+    echo "Options:"
+    echo "  -e, --env <name>      Process only the specified environment"
+    echo "  -h, --help            Display this help message and exit"
     echo ""
-    echo "Si no se especifica -e, se procesan todos los entornos conda disponibles"
+    echo "If -e is not specified, all available conda environments are processed"
     exit 1
 }
 
-# Parsear argumentos
+# Parse arguments
 while [[ "$#" -gt 0 ]]; do
     case "$1" in
         -e|--env)
@@ -59,49 +59,49 @@ while [[ "$#" -gt 0 ]]; do
             usage
             ;;
         *)
-            echo "Parámetro desconocido: $1"
+            echo "Unknown parameter: $1"
             usage
             ;;
     esac
     shift
 done
 
-# Preparación: copiar archivos necesarios y cambiar al usuario seisbio
+# Preparation: copy necessary files and switch to seisbio user
 CURRENT_DIR=$(pwd)
 SEISBIO_HOME="/home/seisbio"
 
-# Si no estamos en /home/seisbio, copiar archivos necesarios
+# If not in /home/seisbio, copy necessary files
 if [[ "$CURRENT_DIR" != "$SEISBIO_HOME" ]]; then
-    echo "[INFO] Copiando archivos necesarios a $SEISBIO_HOME..."
+    echo "[INFO] Copying necessary files to $SEISBIO_HOME..."
     sudo cp virtual_envs.txt small_virtual_envs.txt build_container.sh create_container.sh "$SEISBIO_HOME/" 2>/dev/null
     sudo chown seisbio:seisbio "$SEISBIO_HOME"/{virtual_envs.txt,small_virtual_envs.txt,build_container.sh,create_container.sh} 2>/dev/null
     
-    echo "[INFO] Cambiando a directorio $SEISBIO_HOME y usuario seisbio..."
-    echo "[INFO] Ejecuta: cd $SEISBIO_HOME && sudo su - seisbio"
-    echo "[INFO] Luego ejecuta nuevamente: ./create_container.sh"
+    echo "[INFO] Switching to $SEISBIO_HOME directory and seisbio user..."
+    echo "[INFO] Run: cd $SEISBIO_HOME && sudo su - seisbio"
+    echo "[INFO] Then run again: ./create_container.sh"
     exit 0
 fi
 
-# Verificar que somos el usuario seisbio
+# Verify we are seisbio user
 if [[ "$(whoami)" != "seisbio" ]]; then
-    echo "[WARN] Este script debe ejecutarse como usuario 'seisbio'"
-    echo "Ejecuta: sudo su - seisbio"
+    echo "[WARN] This script must be run as 'seisbio' user"
+    echo "Run: sudo su - seisbio"
     exit 1
 fi
 
-# Carpeta de destino para los env descargados que después serán contenedores
-mkdir -p ambientes
+# Destination folders for environments that will become containers
+mkdir -p environments
 mkdir -p ymls
 
-# Obtener lista de los env (no incluye base)
+# Get list of environments (excludes base)
 if [[ -n "$SELECTED_ENV" ]]; then
-    # Verificar que el entorno existe
+    # Verify that the environment exists
     if "$CONDA" env list | grep -q "^${SELECTED_ENV} "; then
         ENVS="$SELECTED_ENV"
-        echo " == Creando contenedor para el entorno: $SELECTED_ENV =="
+        echo " == Creating container for environment: $SELECTED_ENV =="
     else
-        echo "[ERROR] El entorno '$SELECTED_ENV' no existe"
-        echo "Entornos disponibles:"
+        echo "[ERROR] Environment '$SELECTED_ENV' does not exist"
+        echo "Available environments:"
         "$CONDA" env list | grep -v '^#' | awk '{print "  - " $1}' | grep -v '^base$'
         exit 1
     fi
@@ -109,40 +109,40 @@ else
 	ENVS=$("$CONDA" env list | grep -v '^#' | awk '{print $1}' | grep -v '^base$')
 
     if [[ -z "$ENVS" ]]; then 
-	echo "[INFO] No se encontraron entornos conda disponibles"
+	echo "[INFO] No conda environments found"
 	exit 0
     fi
 
-    echo "== Creando contenedores para todos los envs de conda =="
+    echo "== Creating containers for all conda environments =="
     for env in $ENVS; do
 	    echo "  - $env"
     done
 fi
 
 for ENV_NAME in $ENVS; do
-	echo "Cargando entorno: $ENV_NAME"
+	echo "Loading environment: $ENV_NAME"
 	
-	# Exportar .yml del entorno a carpeta ymls
-	echo "Exportando .yml a ymls/: "
+	# Export environment .yml to ymls folder
+	echo "Exporting .yml to ymls/: "
 	"$CONDA" env export -n $ENV_NAME > ymls/${ENV_NAME}_environment.yml
 
-	# Creando archivo .def
-	echo "=== Creando ==="
-	cat > ambientes/${ENV_NAME}.def << EOF
+	# Creating .def file
+	echo "=== Creating ==="
+	cat > environments/${ENV_NAME}.def << EOF
 Bootstrap: docker 
 From: continuumio/miniconda3
 
 %help 
-	Contenedor Apptainer con entorno conda "${ENV_NAME}"
+	Apptainer container with conda environment "${ENV_NAME}"
 
 %files
 	../ymls/${ENV_NAME}_environment.yml /opt/environment.yml
 
 %post 
-	echo "Creando entorno conda"
+	echo "Creating conda environment"
 	/opt/conda/bin/conda env create -f /opt/environment.yml
 
-	echo "Se está limpiando la cache"
+	echo "Cleaning cache"
 	/opt/conda/bin/conda clean -afy
 
 %environment
@@ -162,10 +162,10 @@ From: continuumio/miniconda3
 	fi
 EOF
 
-	echo " Archivos cargados "
+	echo " Files loaded "
 done
 
-echo "=== Archivos .def creados en carpeta 'ambientes/' ==="
+echo "=== .def files created in 'environments/' folder ==="
 echo ""
-echo "Para construir los contenedores, ejecuta:"
+echo "To build the containers, run:"
 echo "  sudo ./build_container.sh"

@@ -1,17 +1,17 @@
 #!/bin/bash
 
-# Script para construir todos los contenedores .sif desde los archivos .def
-# REQUIERE sudo para ejecutar apptainer build
+# Script to build all .sif containers from .def files
+# REQUIRES sudo to run apptainer build
 
 if [ "$EUID" -ne 0 ]; then
-    echo "[ERROR] Este script debe ejecutarse con sudo" 
-    echo "Uso: sudo ./build_container.sh"
+    echo "[ERROR] This script must be run with sudo" 
+    echo "Usage: sudo ./build_container.sh"
     exit 1
 fi
 
-cd ambientes || exit 1
+cd environments || exit 1
 
-echo "=== Construyendo contenedores Apptainer ==="
+echo "=== Building Apptainer containers ==="
 echo ""
 
 for DEF_FILE in *.def; do
@@ -19,19 +19,19 @@ for DEF_FILE in *.def; do
         ENV_NAME="${DEF_FILE%.def}"
         SIF_FILE="${ENV_NAME}.sif"
         
-        echo "Construyendo ${SIF_FILE} desde ${DEF_FILE}..."
+        echo "Building ${SIF_FILE} from ${DEF_FILE}..."
         apptainer build ${SIF_FILE} ${DEF_FILE}
         
         if [ $? -eq 0 ]; then
-            echo "  ✓ ${SIF_FILE} creado exitosamente"
+            echo "  ✓ ${SIF_FILE} created successfully"
         else
-            echo "  ✗ Error al crear ${SIF_FILE}"
+            echo "  ✗ Error creating ${SIF_FILE}"
         fi
         echo ""
     fi
 done
 
-echo "=== Construcción completada ==="
+echo "=== Build completed ==="
 echo ""
-echo "Los contenedores están en la carpeta 'ambientes/'"
-echo "Para usar un contenedor, ejecuta: ./ambientes/<nombre>.sif"
+echo "Containers are in the 'environments/' folder"
+echo "To use a container, run: ./environments/<name>.sif"
