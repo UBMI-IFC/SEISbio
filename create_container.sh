@@ -74,22 +74,7 @@ if [[ -n "$SELECTED_ENV" ]]; then
         exit 1
     fi
 else
-    # Modo por defecto: procesar TODOS los entornos disponibles
     ENVS=$(conda env list | grep -v '^#' | awk '{print $1}' | grep -v '^$' | grep -v 'base')
-    
-    if [[ -z "$ENVS" ]]; then
-        echo "[INFO] No se encontraron entornos conda disponibles (excepto base)"
-        echo "[INFO] No hay nada que procesar."
-        exit 0
-    fi
-    
-    # Mostrar cuántos entornos se procesarán
-    NUM_ENVS=$(echo "$ENVS" | wc -w)
-    echo "[INFO] Procesando $NUM_ENVS entorno(s) disponible(s):"
-    for env in $ENVS; do
-        echo "  - $env"
-    done
-    echo ""
     echo " == Creando contenedores para todos los envs de conda =="
 fi
 
