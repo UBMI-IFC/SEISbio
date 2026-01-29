@@ -1,5 +1,37 @@
 #!/bin/bash
 
+
+detect_conda() { 
+	if [[ -n "$CONDA_EXE" && -x "$CONDA_EXE"]]; then 
+		echo "$CONDA_EXE"
+		return
+	fi
+
+	local conda_path
+	conda_path=$(command -v conda 2>/dev/null)
+
+	if [[ -z "$conda_path" ]]; then 
+		echo "[ERROR] conda no encontrado en PATH" >&2
+		exit 1
+	fi
+
+	if [[ "conda_path" == */condabin/conda ]]; then 
+		echo "$(dirname "$(dirname "$conda_path")")/bin/conda"
+		return
+	fi
+
+	echo "$conda_path"
+}
+
+CONDA=$(detect_conda)
+
+if [[ ! -x "$CONDA" ]]; then
+	echo "[ERROR] conda no ejecutable: $CONDA"
+	exit 1
+fi
+
+echo "[INFO] Usando conda:  $($CONDA --version)"
+
 # Valores por defecto
 SELECTED_ENV=""
 
@@ -70,12 +102,21 @@ if [[ -n "$SELECTED_ENV" ]]; then
     else
         echo "[ERROR] El entorno '$SELECTED_ENV' no existe"
         echo "Entornos disponibles:"
-        conda env list | grep -v '^#' | awk '{print "  - " $1}' | grep -v '^$' | grep -v 'base'
+	"$CONDA" env list | grep -v '^#' | awk '{print "  - " $1}' | grep -v '^base$'
         exit 1
     fi
 else
-    ENVS=$(conda env list | grep -v '^#' | awk '{print $1}' | grep -v '^$' | grep -v 'base')
-    echo " == Creando contenedores para todos los envs de conda =="
+	ENVS=$("$CONDA" env list | grep -v '^#' | awk '{print $1}' | grep -v '^base$')
+
+    if [[ -z "$ENVS" ]]; then 
+	echo "[INFO] No se encontraron entornos conda disponibles"
+	exit 0
+    fi
+
+    echo "== Creando contenedores para todos los envs de conda =="
+    for env in $ENVS; do
+	    echo "  - $env"
+    done
 fi
 
 for ENV_NAME in $ENVS; do
