@@ -2,7 +2,7 @@
 
 
 detect_conda() { 
-	if [[ -n "$CONDA_EXE" && -x "$CONDA_EXE"]]; then 
+	if [[ -n "$CONDA_EXE" && -x "$CONDA_EXE" ]]; then 
 		echo "$CONDA_EXE"
 		return
 	fi
@@ -15,7 +15,7 @@ detect_conda() {
 		exit 1
 	fi
 
-	if [[ "conda_path" == */condabin/conda ]]; then 
+	if [[ "$conda_path" == */condabin/conda ]]; then 
 		echo "$(dirname "$(dirname "$conda_path")")/bin/conda"
 		return
 	fi
@@ -96,13 +96,13 @@ mkdir -p ymls
 # Obtener lista de los env (no incluye base)
 if [[ -n "$SELECTED_ENV" ]]; then
     # Verificar que el entorno existe
-    if conda env list | grep -q "^${SELECTED_ENV} "; then
+    if "$CONDA" env list | grep -q "^${SELECTED_ENV} "; then
         ENVS="$SELECTED_ENV"
         echo " == Creando contenedor para el entorno: $SELECTED_ENV =="
     else
         echo "[ERROR] El entorno '$SELECTED_ENV' no existe"
         echo "Entornos disponibles:"
-	"$CONDA" env list | grep -v '^#' | awk '{print "  - " $1}' | grep -v '^base$'
+        "$CONDA" env list | grep -v '^#' | awk '{print "  - " $1}' | grep -v '^base$'
         exit 1
     fi
 else
@@ -124,7 +124,7 @@ for ENV_NAME in $ENVS; do
 	
 	# Exportar .yml del entorno a carpeta ymls
 	echo "Exportando .yml a ymls/: "
-	conda env export -n $ENV_NAME > ymls/${ENV_NAME}_environment.yml
+	"$CONDA" env export -n $ENV_NAME > ymls/${ENV_NAME}_environment.yml
 
 	# Creando archivo .def
 	echo "=== Creando ==="
