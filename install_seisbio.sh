@@ -287,6 +287,18 @@ install_env_from_yml() {
     
     echo "[INFO] Environment name from YAML: $env_name"
     
+    # Copy YAML file to seisbio's home to avoid permission issues
+    local temp_yml="/home/$home/temp_env_${env_name}.yml"
+    echo "[INFO] Copying YAML file to $temp_yml"
+    sudo cp "$yml_path" "$temp_yml" || {
+        echo "[ERROR] Failed to copy YAML file to seisbio home."
+        return 1
+    }
+    sudo chown "$uid:$uid" "$temp_yml" || {
+        echo "[ERROR] Failed to set ownership of temporary YAML file."
+        return 1
+    }
+    
     # Check if environment already exists
     local env_info=$(sudo -i -u "$home" bash -c "conda env list" | awk '{print $1}')
     
@@ -297,20 +309,27 @@ install_env_from_yml() {
             echo "[INFO] Removing existing environment: $env_name"
             sudo -i -u "$home" bash -c "~/$distribution/bin/conda env remove -n $env_name -y" || {
                 echo "[ERROR] Failed to remove environment $env_name."
+                sudo rm -f "$temp_yml"
                 return 1
             }
         else
             echo "[INFO] Skipping installation of $env_name."
+            sudo rm -f "$temp_yml"
             return 0
         fi
     fi
     
     # Install environment from YAML
     echo "[INFO] Creating environment '$env_name' from YAML file..."
-    sudo -i -u "$home" bash -c "~/$distribution/bin/$manager env create -f $yml_path" || {
+    sudo -i -u "$home" bash -c "~/$distribution/bin/$manager env create -f ~/temp_env_${env_name}.yml" || {
         echo "[ERROR] Failed to create environment from YAML file."
+        sudo rm -f "$temp_yml"
         return 1
     }
+    
+    # Clean up temporary file
+    echo "[INFO] Cleaning up temporary YAML file..."
+    sudo rm -f "$temp_yml"
     
     echo "[SUCCESS] Environment '$env_name' created successfully!"
     return 0
