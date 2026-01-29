@@ -117,35 +117,6 @@ CURRENT_USER=$(whoami)
 CURRENT_UID=$(id -u)
 CURRENT_GID=$(id -g)
 
-# Check if YAML file is specified and delegate to Python script
-if [[ -n "$YML_FILE" ]]; then
-    echo "[INFO] YAML file specified: $YML_FILE"
-    echo "[INFO] Delegating to Python script for YAML support..."
-    
-    # Build Python command with appropriate arguments
-    PYTHON_CMD="python3 $(dirname "$0")/InstallSEISbio.py"
-    PYTHON_CMD="$PYTHON_CMD --distribution $DISTRIBUTION"
-    PYTHON_CMD="$PYTHON_CMD --home $HOME_DIR"
-    PYTHON_CMD="$PYTHON_CMD --homeid $HOME_ID"
-    PYTHON_CMD="$PYTHON_CMD --yml $YML_FILE"
-    
-    if [[ "$DEBIAN_INSTALL" == "true" ]]; then
-        PYTHON_CMD="$PYTHON_CMD --debian"
-    fi
-    
-    if [[ "$DEB_UPGRADE" == "true" ]]; then
-        PYTHON_CMD="$PYTHON_CMD --debupgrade"
-    fi
-    
-    if [[ "$LOCAL_INSTALL" == "true" ]]; then
-        PYTHON_CMD="$PYTHON_CMD --local"
-    fi
-    
-    echo "[INFO] Executing: $PYTHON_CMD"
-    eval "$PYTHON_CMD"
-    exit $?
-fi
-
 # Resolve envfile path
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 if [[ "$ENV_FILE" == "envs/virtual_envs.txt" ]]; then
@@ -282,6 +253,67 @@ install_distribution_base() {
 
      # Run install as the target user with login shell
     sudo -i -u "$home" bash -c "~/$distribution/bin/$manager install -y -q $packages" || { echo "[ERROR] Failed to install base packages."; return 1; }    
+}
+
+# Function to install environment from YAML file
+install_env_from_yml() {
+    local yml_file="$1"
+    local manager="$2"
+    local distribution="$3"
+    local home="$4"
+    local uid="$5"
+
+    echo "[INFO] Installing environment from YAML file: $yml_file"
+    
+    # Resolve yml file path if relative
+    local yml_path="$yml_file"
+    if [[ "$yml_file" != /* ]]; then
+        yml_path="$(pwd)/$yml_file"
+    fi
+    
+    if [[ ! -f "$yml_path" ]]; then
+        echo "[ERROR] YAML file not found: $yml_path"
+        return 1
+    fi
+    
+    # Extract environment name from YAML file
+    local env_name=$(grep -E '^name:' "$yml_path" | head -1 | awk '{print $2}')
+    
+    if [[ -z "$env_name" ]]; then
+        echo "[ERROR] Could not extract environment name from YAML file."
+        echo "[INFO] Make sure the YAML file has a 'name:' field."
+        return 1
+    fi
+    
+    echo "[INFO] Environment name from YAML: $env_name"
+    
+    # Check if environment already exists
+    local env_info=$(sudo -i -u "$home" bash -c "conda env list" | awk '{print $1}')
+    
+    if [[ "$env_info" =~ "$env_name" ]]; then
+        echo "[WARN] Environment '$env_name' already exists!"
+        read -p "Do you want to remove and recreate it? y/[n]: " ANSWER_RECREATE
+        if [[ "$ANSWER_RECREATE" == "y" ]]; then
+            echo "[INFO] Removing existing environment: $env_name"
+            sudo -i -u "$home" bash -c "~/$distribution/bin/conda env remove -n $env_name -y" || {
+                echo "[ERROR] Failed to remove environment $env_name."
+                return 1
+            }
+        else
+            echo "[INFO] Skipping installation of $env_name."
+            return 0
+        fi
+    fi
+    
+    # Install environment from YAML
+    echo "[INFO] Creating environment '$env_name' from YAML file..."
+    sudo -i -u "$home" bash -c "~/$distribution/bin/$manager env create -f $yml_path" || {
+        echo "[ERROR] Failed to create environment from YAML file."
+        return 1
+    }
+    
+    echo "[SUCCESS] Environment '$env_name' created successfully!"
+    return 0
 }
 
 # Function to install virtual environments
@@ -441,6 +473,30 @@ main() {
     # Verify all input files before starting
     verify_input_files
     
+    # Check if YAML file is specified and seisbio already exists
+    if [[ -n "$YML_FILE" ]] && [[ -d "/home/$HOME_DIR" ]] && [[ -d "/home/$HOME_DIR/$DISTRIBUTION" ]]; then
+        echo "[INFO] YAML file specified and SEISbio installation detected."
+        echo "[INFO] Installing only the environment from YAML file (no system recreation)."
+        echo "====================="
+        
+        install_env_from_yml "$YML_FILE" "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID"
+        
+        if [[ $? -eq 0 ]]; then
+            echo "[END] YAML environment installation completed."
+        else
+            echo "[ERROR] Failed to install environment from YAML."
+            exit 1
+        fi
+        exit 0
+    fi
+    
+    # If YAML specified but seisbio doesn't exist, warn and proceed with full installation
+    if [[ -n "$YML_FILE" ]] && [[ ! -d "/home/$HOME_DIR/$DISTRIBUTION" ]]; then
+        echo "[INFO] YAML file specified but SEISbio not installed yet."
+        echo "[INFO] Will perform full SEISbio installation first, then install YAML environment."
+        echo "====================="
+    fi
+    
     if [[ "$LOCAL_INSTALL" == "true" ]]; then
         echo "[INFO] Installing system locally"
         echo "[INFO] in user $CURRENT_USER (uid: $CURRENT_UID, gid: $CURRENT_GID)"
@@ -493,6 +549,14 @@ main() {
         echo "[INFO] virtual envs."
         ENV_LIST=$(read_env_file "$ENV_FILE_PATH")
         install_virtual_envs "$ENV_LIST" "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID"
+        
+        # Install YAML environment if specified
+        if [[ -n "$YML_FILE" ]]; then
+            echo "====================="
+            echo "[INFO] Installing additional environment from YAML file."
+            install_env_from_yml "$YML_FILE" "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID"
+        fi
+        
         echo "[END] All packages installed"
 
         exit 0
@@ -602,6 +666,14 @@ main() {
     echo "[INFO] virtual envs."
     ENV_LIST=$(read_env_file "$ENV_FILE_PATH")
     install_virtual_envs "$ENV_LIST" "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID"
+    
+    # Install YAML environment if specified
+    if [[ -n "$YML_FILE" ]]; then
+        echo "====================="
+        echo "[INFO] Installing additional environment from YAML file."
+        install_env_from_yml "$YML_FILE" "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID"
+    fi
+    
     echo "[END] All packages installed"
 }
 
