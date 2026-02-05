@@ -29,8 +29,8 @@ revert_bashrc_changes() {
 	local bashrc_path="$1"
 	echo "[INFO] Attempting to revert changes in $bashrc_path"
 
-	if [[ ! -f "$bashrc_path" ]];then 
-		echo "[ERROR] File not found: $bashrc_path. Cannot revert changes."+
+	if [[ ! -f "$bashrc_path" ]]; then 
+		echo "[ERROR] File not found: $bashrc_path. Cannot revert changes."
 		return 1
 	fi
 
@@ -64,9 +64,9 @@ revert_bashrc_changes() {
 remove_containers() {
 	local home_dir="/home/$USERNAME"
 
-	if [[-d "$home_dir/enviroments" ]]; then
-		echo "[INFO] Removing Apptainer containers from $home_dir/enviroments"
-		rm -rf "$home_dir/enviroments"
+	if [[ -d "$home_dir/environments" ]]; then
+		echo "[INFO] Removing Apptainer containers from $home_dir/environments"
+		rm -rf "$home_dir/environments"
 		echo "[INFO] Containers removed."
 	fi
 

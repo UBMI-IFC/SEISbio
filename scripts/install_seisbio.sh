@@ -19,9 +19,9 @@ HOME_DIR="seisbio"
 HOME_ID=1015
 DEBIAN_INSTALL=false
 DEB_UPGRADE=false
-ENV_FILE="envs/virtual_envs.txt"
+ENV_FILE="../envs/virtual_envs.txt"
 YML_FILE=""
-BASE_PACKAGES_FILE="base/base_packages.txt"
+BASE_PACKAGES_FILE="../base/base_packages.txt"
 SKIP_BASE_PACKAGES=false
 LOCAL_INSTALL=false
 
@@ -119,7 +119,7 @@ CURRENT_GID=$(id -g)
 
 # Resolve envfile path
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-if [[ "$ENV_FILE" == "envs/virtual_envs.txt" ]]; then
+if [[ "$ENV_FILE" == "../envs/virtual_envs.txt" ]]; then
     ENV_FILE_PATH="$SCRIPT_DIR/$ENV_FILE"
     echo "     ... from default file:"
     echo "     ... $ENV_FILE_PATH"
@@ -156,8 +156,8 @@ debian_install_bioinfo() {
         sudo apt upgrade -y
     fi
 
-    local basic_file="$SCRIPT_DIR/deb/basic_pkgs.txt"
-    local bioinfo_file="$SCRIPT_DIR/deb/bioinfo_pkgs.txt"
+    local basic_file="$SCRIPT_DIR/../deb/basic_pkgs.txt"
+    local bioinfo_file="$SCRIPT_DIR/../deb/bioinfo_pkgs.txt"
 
     local basic_pkgs=$(read_env_file "$basic_file")
     local bioinfo_pkgs=$(read_env_file "$bioinfo_file")
