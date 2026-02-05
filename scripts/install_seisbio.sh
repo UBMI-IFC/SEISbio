@@ -119,13 +119,22 @@ CURRENT_GID=$(id -g)
 
 # Resolve envfile path
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-if [[ "$ENV_FILE" == "../envs/virtual_envs.txt" ]]; then
+
+# Resolve ENV_FILE_PATH intelligently
+if [[ "$ENV_FILE" == /* ]]; then
+    # Absolute path - use as is
+    ENV_FILE_PATH="$ENV_FILE"
+    echo "     ... from absolute path:"
+    echo "     ... $ENV_FILE_PATH"
+elif [[ "$ENV_FILE" == ../* ]] || [[ "$ENV_FILE" == ../envs/* ]]; then
+    # Relative to script directory
     ENV_FILE_PATH="$SCRIPT_DIR/$ENV_FILE"
-    echo "     ... from default file:"
+    echo "     ... from path relative to script:"
     echo "     ... $ENV_FILE_PATH"
 else
+    # Relative to current working directory
     ENV_FILE_PATH="$(pwd)/$ENV_FILE"
-    echo "     ... from file:"
+    echo "     ... from current directory:"
     echo "     ... $ENV_FILE_PATH"
 fi
 
