@@ -410,6 +410,7 @@ verify_input_files() {
     local errors=0
     
     echo "[INFO] Verifying input files..."
+    echo "[DEBUG] SCRIPT_DIR = $SCRIPT_DIR"
     
     # Verify ENV_FILE if not empty
     if [[ -n "$ENV_FILE" && "$ENV_FILE" != "" ]]; then
@@ -457,8 +458,8 @@ verify_input_files() {
     
     # Verify Debian package files if --debian specified
     if [[ "$DEBIAN_INSTALL" == "true" ]]; then
-        local basic_file="$SCRIPT_DIR/deb/basic_pkgs.txt"
-        local bioinfo_file="$SCRIPT_DIR/deb/bioinfo_pkgs.txt"
+        local basic_file="$SCRIPT_DIR/../deb/basic_pkgs.txt"
+        local bioinfo_file="$SCRIPT_DIR/../deb/bioinfo_pkgs.txt"
         
         if [[ ! -f "$basic_file" ]]; then
             echo "[ERROR] Debian basic packages file not found: $basic_file"
