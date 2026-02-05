@@ -1,174 +1,182 @@
 # SEISbio
-Sistema Estandarizado de Instalación de Software bioinformático
+Standardized System for Bioinformatics Software Installation
 
-Este proyecto proporciona un sistema automatizado para instalar y gestionar software bioinformático mediante entornos virtuales de conda/mamba y su posterior empaquetado en contenedores Apptainer portables.
+This project provides an automated system to install and manage bioinformatics software through conda/mamba virtual environments and their subsequent packaging into portable Apptainer containers.
 
-## Flujo de Trabajo Completo
+## Complete Workflow
 
-### Fase 1: Instalación del Sistema SEISbio (`install_seisbio.sh`)
-### Transición: Preparación del entorno (`seisbio.sh`)
-### Fase 2: Creación de Contenedores Apptainer (`create_container.sh` y `build_container.sh`)
+### Phase 1: SEISbio System Installation (`install_seisbio.sh`)
+### Transition: Environment Preparation (`seisbio.sh`)
+### Phase 2: Apptainer Container Creation (`create_container.sh` and `build_container.sh`)
 
-## Fase 1: Instalación del Sistema SEISbio
+## Phase 1: SEISbio System Installation
 
-### Descripción
+### Description
 
-El script `install_seisbio.sh` realiza la instalación completa del sistema SEISbio:
+The `install_seisbio.sh` script performs a complete installation of the SEISbio system:
 
-1. **Instalación de paquetes del sistema** (opcional): Instala paquetes básicos y bioinformáticos desde repositorios Debian/Ubuntu
-2. **Creación del usuario seisbio**: Crea un usuario dedicado con UID/GID 1015 (configurable)
-3. **Instalación de la distribución**: Descarga e instala Miniforge o Miniconda en `/home/seisbio/`
-4. **Configuración base**: Instala paquetes científicos base (numpy, scipy, pandas, jupyter, R, etc.)
-5. **Creación de entornos virtuales**: Instala entornos independientes para cada herramienta bioinformática
+1. **System package installation** (optional): Installs basic and bioinformatics packages from Debian/Ubuntu repositories
+2. **Creation of seisbio user**: Creates a dedicated user with UID/GID 1015 (configurable)
+3. **Distribution installation**: Downloads and installs Miniforge or Miniconda in `/home/seisbio/`
+4. **Base configuration**: Installs base scientific packages (numpy, scipy, pandas, jupyter, R, etc.)
+5. **Virtual environment creation**: Installs independent environments for each bioinformatics tool
 
-### Archivos de Configuración
+### Configuration Files
 
-- **`virtual_envs.txt`**: Lista completa de entornos bioinformáticos a crear
-- **`small_virtual_envs.txt`**: Lista reducida para instalaciones de prueba o limitadas
+- **`virtual_envs.txt`**: Complete list of bioinformatics environments to create
+- **`small_virtual_envs.txt`**: Reduced list for test or limited installations
 
-Cada línea contiene el nombre de un paquete de conda-forge o bioconda. Se puede especificar versión: `hicexplorer=3.2`
+Each line contains the name of a conda-forge or bioconda package. Version can be specified: `hicexplorer=3.2`
 
-### Uso de install_seisbio.sh
+### Usage of install_seisbio.sh
 
-**Sintaxis:**
+**Syntax:**
 ```bash
-sudo ./install_seisbio.sh [OPCIONES]
+sudo ./install_seisbio.sh [OPTIONS]
 ```
 
-### Resultado de la Fase 1
+### Phase 1 Results
 
-Después de ejecutar `install_seisbio.sh`:
-- Usuario `seisbio` creado en `/home/seisbio/`
-- Miniforge o Miniconda instalado en `/home/seisbio/miniforge/` o `/home/seisbio/miniconda/`
-- Entornos virtuales creados en `/home/seisbio/miniforge/envs/` (uno por herramienta)
-- Conda inicializado en `/etc/bash.bashrc` (accesible para todos los usuarios)
+After running `install_seisbio.sh`:
+- User `seisbio` created in `/home/seisbio/`
+- Miniforge or Miniconda installed in `/home/seisbio/miniforge/` or `/home/seisbio/miniconda/`
+- Virtual environments created in `/home/seisbio/miniforge/envs/` (one per tool)
+- Conda initialized in `/etc/bash.bashrc` (accessible to all users)
 
-## Transición: Preparación del Entorno
+## Transition: Environment Preparation
 
-### Descripción del script `seisbio.sh`
+### Description of `seisbio.sh` script
 
-El script `seisbio.sh` es un auxiliar que facilita la transición entre la Fase 1 (instalación) y la Fase 2 (creación de contenedores). Su propósito es preparar el entorno del usuario `seisbio` con los archivos necesarios.
+The `seisbio.sh` script is a helper that facilitates the transition between Phase 1 (installation) and Phase 2 (container creation). Its purpose is to prepare the `seisbio` user's environment with the necessary files.
 
-**Lo que hace:**
-1. **Copia archivos necesarios**: Traslada `virtual_envs.txt`, `small_virtual_envs.txt`, `build_container.sh` y `create_container.sh` al directorio `/home/seisbio/`
-2. **Cambia al usuario seisbio**: Abre una sesión interactiva como el usuario `seisbio`
+**What it does:**
+1. **Copies necessary files**: Transfers `virtual_envs.txt`, `small_virtual_envs.txt`, `build_container.sh`, `create_container.sh`, and `install_seisbio.sh` to the `/home/seisbio/` directory
+2. **Verifies Apptainer installation**: Automatically installs Apptainer if it's not already present on the system
+3. **Switches to seisbio user**: Opens an interactive session as the `seisbio` user
 
-### Uso de seisbio.sh
+### Usage of seisbio.sh
 
-Ejecuta este script después de completar la Fase 1 y antes de iniciar la Fase 2:
+Run this script after completing Phase 1 and before starting Phase 2:
 
 ```bash
 ./seisbio.sh
 ```
 
-Este comando:
-- Copiará automáticamente los archivos necesarios a `/home/seisbio/`
-- Te posicionará en el directorio `/home/seisbio/`
-- Abrirá una sesión como usuario `seisbio`
+This command will:
+- Automatically copy the necessary files to `/home/seisbio/`
+- Position you in the `/home/seisbio/` directory
+- Open a session as the `seisbio` user
 
-## Fase 2: Creación de Contenedores Apptainer
+## Phase 2: Apptainer Container Creation
 
-### Descripción
+### Description
 
-Una vez completada la Fase 1, los entornos conda instalados pueden convertirse en contenedores Apptainer portables que funcionan de manera independiente en cualquier sistema con Apptainer instalado.
+Once Phase 1 is completed, the installed conda environments can be converted into portable Apptainer containers that work independently on any system with Apptainer installed.
 
-## Descripción de los Scripts
+## Script Descriptions
 
-### `crear_contenedor.sh`
+### `create_container.sh`
 
-Exporta los entornos conda existentes y crea archivos de definición (`.def`) para construir contenedores Apptainer.
+Exports existing conda environments and creates definition files (`.def`) to build Apptainer containers.
 
-**Lo que hace:**
-- Exporta la configuración de cada entorno a un archivo `_environment.yml`
-- Crea archivos `.def` con las instrucciones para construir los contenedores
-- Guarda todo en la carpeta `ambientes/`
+**What it does:**
+- Automatically detects the conda/mamba installation
+- Auto-detects if running outside `/home/seisbio/` and handles file copying automatically
+- Verifies execution as `seisbio` user
+- Exports each environment's configuration to an `_environment.yml` file in the `ymls/` folder
+- Creates `.def` files with instructions for building the containers in the `environments/` folder
+- Creates two directories: `ymls/` for YAML files and `environments/` for definition and container files
 
-### `construir_contenedores.sh`
+### `build_container.sh`
 
-Construye los contenedores Apptainer (archivos `.sif`) a partir de los archivos `.def` creados previamente.
+Builds the Apptainer containers (`.sif` files) from the previously created `.def` files.
 
-**Lo que hace:**
-- Lee todos los archivos `.def` en la carpeta `ambientes/`
-- Construye cada contenedor usando `apptainer build`
-- Genera archivos `.sif` que son contenedores portables y autocontenidos
+**What it does:**
+- Reads all `.def` files in the `environments/` folder
+- Builds each container using `apptainer build`
+- Generates `.sif` files that are portable and self-contained containers
 
-## Uso
+## Usage
 
-### Paso 1: Dar permisos de ejecución
-
-```bash
-chmod +x crear_contenedor.sh construir_contenedores.sh
-```
-
-### Paso 2: Crear archivos de definición
-
-**Opción A: Procesar todos los entornos**
+### Step 1: Grant execution permissions
 
 ```bash
-./crear_contenedor.sh
+chmod +x create_container.sh build_container.sh
 ```
 
-Esto procesará todos los entornos conda disponibles (excepto `base`).
+### Step 2: Create definition files
 
-**Opción B: Procesar un entorno específico**
+**Note:** If you run `create_container.sh` from outside `/home/seisbio/`, it will automatically copy the necessary files and prompt you to switch to the `seisbio` user. Simply run it again after switching users.
+
+**Option A: Process all environments**
 
 ```bash
-./crear_contenedor.sh -e samtools
-./crear_contenedor.sh --env fastqc
+./create_container.sh
 ```
 
-Esto procesará únicamente el entorno especificado.
+This will process all available conda environments (except `base`).
 
-**Ver ayuda:**
+**Option B: Process a specific environment**
 
 ```bash
-./crear_contenedor.sh -h
+./create_container.sh -e samtools
+./create_container.sh --env fastqc
 ```
 
-### Paso 3: Construir los contenedores
+This will process only the specified environment.
 
-**Requiere permisos de root (sudo)**
+**View help:**
 
 ```bash
-sudo ./construir_contenedores.sh
+./create_container.sh -h
 ```
 
-Este proceso puede tardar bastante tiempo, ya que:
-- Descarga la imagen base de Docker (continuumio/miniconda3)
-- Instala todas las dependencias dentro de cada contenedor
-- Crea contenedores autocontenidos y portables
+### Step 3: Build the containers
 
-**Resultado del Paso 3:**
-
-En la carpeta `ambientes/` se crearán:
-- `<nombre>.sif` - Contenedor Apptainer listo para usar
-
-## Uso de los Contenedores
-
-Una vez construidos los contenedores, ejecutamos:
-
-### Abrir una shell interactiva
+**Requires root permissions (sudo)**
 
 ```bash
-./ambientes/<nombre>.sif
+sudo ./build_container.sh
 ```
 
-## Estructura de Archivos Resultante
+This process may take quite some time, as it:
+- Downloads the Docker base image (continuumio/miniconda3)
+- Installs all dependencies inside each container
+- Creates self-contained and portable containers
+
+**Step 3 Results:**
+
+After the build process:
+- `ymls/` folder contains: `<name>_environment.yml` files (exported conda environments)
+- `environments/` folder contains: `<name>.def` (definition files) and `<name>.sif` (ready-to-use containers)
+
+## Container Usage
+
+Once the containers are built, we run:
+
+### Open an interactive shell
+
+```bash
+./environments/<name>.sif
+```
+
+## Resulting File Structure
 
 ```
-ambientes/
+ymls/
 ├── samtools_environment.yml
+├── fastqc_environment.yml
+├── star_environment.yml
+└── ...
+
+environments/
 ├── samtools.def
 ├── samtools.sif
-├── fastqc_environment.yml
 ├── fastqc.def
 ├── fastqc.sif
-├── star_environment.yml
 ├── star.def
-└── star.sif
-.
-.
-.
+├── star.sif
+└── ...
 ```
 
 
