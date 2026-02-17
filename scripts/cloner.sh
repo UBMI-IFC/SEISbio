@@ -6,6 +6,7 @@ DISTRIBUTION="miniforge"
 MANAGER="mamba"
 SELECTED_ENV=""
 TEMP_DIR="/tmp/seisbio_clone_$$"
+CREATE_CONTAINER=false
 
 # Function to display usage
 usage() {
@@ -15,15 +16,12 @@ usage() {
     echo "Options:"
     echo "  -e, --env <name>              Clone only the specified environment"
     echo "  -u, --user <name>             Target user to clone environments to [default: seisbio]"
-    echo "  -d, --distribution <name>     Distribution name (miniforge/miniconda) [default: miniforge]"
-    echo "  -m, --manager <name>          Package manager (mamba/conda) [default: mamba]"
+    echo "  -d, --distribution <name>     Distribution name (miniforge/miniconda) [default: auto-detect]"
+    echo "  -m, --manager <name>          Package manager (mamba/conda) [default: auto-detect]"
+    echo "  -c, --container               Create Apptainer container after cloning"
     echo "  -h, --help                    Display this help message and exit"
     echo ""
-    echo "Examples:"
-    echo "  $0                            # Clone all environments to seisbio"
-    echo "  $0 -e fastqc-env              # Clone only fastqc-env to seisbio"
-    echo "  $0 -u myuser -d miniconda     # Clone to myuser using miniconda"
-    exit 1
+       exit 1
 }
 
 # Parse arguments
@@ -44,6 +42,9 @@ while [[ "$#" -gt 0 ]]; do
         -m|--manager)
             MANAGER="$2"
             shift
+            ;;
+        -c|--container)
+            CREATE_CONTAINER=true
             ;;
         -h|--help)
             usage
@@ -120,6 +121,105 @@ detect_distribution_and_manager() {
     
     # Return both values separated by space
     echo "${detected_dist:-miniforge} ${detected_mgr:-mamba}"
+}
+
+# Function to create Apptainer container from environment
+create_apptainer_container() {
+    local env_name="$1"
+    local target_user="$2"
+    local distribution="$3"
+    
+    echo ""
+    echo "-----------------------------------"
+    echo "[CONTAINER] Creating Apptainer container for: $env_name"
+    
+    # Check if Apptainer is installed
+    if ! command -v apptainer &>/dev/null; then
+        echo "[WARN] Apptainer not installed. Skipping container creation."
+        echo "[INFO] Install with: sudo apt install apptainer"
+        return 1
+    fi
+    
+    # Get environment path
+    local env_path=$(sudo -i -u "$target_user" bash -c "conda env list" 2>/dev/null | grep "^${env_name} " | awk '{print $2}')
+    
+    if [[ -z "$env_path" ]]; then
+        echo "[ERROR] Could not determine path for environment $env_name"
+        return 1
+    fi
+    
+    echo "[INFO] Environment path: $env_path"
+    
+    # Create directories in target user's home
+    sudo -u "$target_user" mkdir -p "/home/$target_user/environments" "/home/$target_user/ymls"
+    
+    # Export environment to YAML
+    local yml_file="/home/$target_user/ymls/${env_name}_environment.yml"
+    echo "[INFO] Exporting environment to: $yml_file"
+    
+    if ! sudo -i -u "$target_user" bash -c "conda env export -n $env_name > ~/ymls/${env_name}_environment.yml" 2>/dev/null; then
+        echo "[ERROR] Failed to export environment $env_name"
+        return 1
+    fi
+    
+    # Create .def file
+    local def_file="/home/$target_user/environments/${env_name}.def"
+    echo "[INFO] Creating definition file: $def_file"
+    
+    sudo -u "$target_user" cat > "$def_file" << EOF
+Bootstrap: docker
+From: continuumio/miniconda3
+
+%help
+    Apptainer container with conda environment "${env_name}"
+    Original environment path: ${env_path}
+
+%files
+    ymls/${env_name}_environment.yml /opt/environment.yml
+
+%post
+    echo "Creating conda environment at original path: ${env_path}"
+    
+    # Create directory structure matching original path
+    mkdir -p "$(dirname "${env_path}")"
+    
+    # Create environment at the same path as original
+    /opt/conda/bin/conda env create -f /opt/environment.yml -p "${env_path}"
+    
+    echo "Cleaning cache"
+    /opt/conda/bin/conda clean -afy
+
+%environment
+    export PATH=${env_path}/bin:/opt/conda/bin:\$PATH
+    export CONDA_DEFAULT_ENV=${env_name}
+    export CONDA_PREFIX=${env_path}
+
+%runscript
+    #!/bin/bash
+    source /opt/conda/etc/profile.d/conda.sh
+    conda activate "${env_path}"
+    
+    if [ \$# -eq 0 ]; then
+        exec /bin/bash
+    else
+        exec "\$@"
+    fi
+EOF
+    
+    # Build container
+    local sif_file="/home/$target_user/environments/${env_name}.sif"
+    echo "[INFO] Building container: $sif_file"
+    echo "[INFO] This may take several minutes..."
+    
+    if sudo apptainer build "$sif_file" "$def_file" 2>&1 | tee "/tmp/apptainer_build_${env_name}.log"; then
+        echo "[SUCCESS] Container created: $sif_file"
+        sudo chown "$target_user:$target_user" "$sif_file"
+        return 0
+    else
+        echo "[ERROR] Failed to build container for $env_name"
+        echo "[INFO] Check log: /tmp/apptainer_build_${env_name}.log"
+        return 1
+    fi
 }
 
 # Get current user info
@@ -223,6 +323,8 @@ TOTAL=0
 SUCCESS=0
 FAILED=0
 SKIPPED=0
+CONTAINERS_CREATED=0
+CONTAINERS_FAILED=0
 
 # Get existing environments in target user
 echo "[INFO] Checking existing environments in $TARGET_USER..."
@@ -279,6 +381,15 @@ for ENV_NAME in $ENVS; do
     if sudo -i -u "$TARGET_USER" bash -c "~/$DISTRIBUTION/bin/$MANAGER env create -f ~/${ENV_NAME}_temp.yml" 2>&1 | tee /tmp/clone_output_$$.log; then
         echo "[SUCCESS] Environment '$ENV_NAME' cloned successfully!"
         SUCCESS=$((SUCCESS + 1))
+        
+        # Create Apptainer container if requested
+        if [[ "$CREATE_CONTAINER" == "true" ]]; then
+            if create_apptainer_container "$ENV_NAME" "$TARGET_USER" "$DISTRIBUTION"; then
+                CONTAINERS_CREATED=$((CONTAINERS_CREATED + 1))
+            else
+                CONTAINERS_FAILED=$((CONTAINERS_FAILED + 1))
+            fi
+        fi
     else
         echo "[ERROR] Failed to create environment $ENV_NAME in $TARGET_USER"
         FAILED=$((FAILED + 1))
@@ -304,6 +415,11 @@ echo "Total environments processed: $TOTAL"
 echo "Successfully cloned: $SUCCESS"
 echo "Failed: $FAILED"
 echo "Skipped: $SKIPPED"
+if [[ "$CREATE_CONTAINER" == "true" ]]; then
+    echo "-----------------------------------"
+    echo "Containers created: $CONTAINERS_CREATED"
+    echo "Containers failed: $CONTAINERS_FAILED"
+fi
 echo "====================================="
 echo ""
 
@@ -312,6 +428,19 @@ if [[ $SUCCESS -gt 0 ]]; then
     echo "[INFO] To verify, run:"
     echo "       sudo -i -u $TARGET_USER"
     echo "       conda env list"
+    
+    if [[ "$CREATE_CONTAINER" == "true" && $CONTAINERS_CREATED -gt 0 ]]; then
+        echo ""
+        echo "[INFO] Apptainer containers available in:"
+        echo "       /home/$TARGET_USER/environments/"
+        echo ""
+        echo "[INFO] To test a container, run:"
+        echo "       sudo -i -u $TARGET_USER"
+        echo "       ./environments/<env_name>.sif <command>"
+        echo ""
+        echo "[EXAMPLE] For muscle-env:"
+        echo "       ./environments/muscle-env.sif muscle -version"
+    fi
 fi
 
 exit 0
