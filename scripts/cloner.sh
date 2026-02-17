@@ -19,9 +19,6 @@ usage() {
     echo "  -m, --manager <name>          Package manager (mamba/conda) [default: auto-detect]"
     echo "  -h, --help                    Display this help message and exit"
     echo ""
-    echo "Examples:"
-    echo "  $0 -e muscle-env              # Clone muscle-env and create container"
-    echo "  $0                            # Clone all environments and create containers"
        exit 1
 }
 
@@ -126,10 +123,12 @@ create_apptainer_container() {
     local env_name="$1"
     local target_user="$2"
     local distribution="$3"
+    local original_env_path="$4"
     
     echo ""
     echo "-----------------------------------"
     echo "[CONTAINER] Creating Apptainer container for: $env_name"
+    echo "[INFO] Using original environment path: $original_env_path"
     
     # Check if Apptainer is installed
     if ! command -v apptainer &>/dev/null; then
@@ -138,15 +137,20 @@ create_apptainer_container() {
         return 1
     fi
     
-    # Get environment path
-    local env_path=$(sudo -i -u "$target_user" bash -c "conda env list" 2>/dev/null | grep "^${env_name} " | awk '{print $2}')
+    # Use original path if provided, otherwise get from cloned environment
+    local env_path="$original_env_path"
     
     if [[ -z "$env_path" ]]; then
-        echo "[ERROR] Could not determine path for environment $env_name"
-        return 1
+        env_path=$(sudo -i -u "$target_user" bash -c "/home/$target_user/$distribution/bin/conda env list" 2>/dev/null | grep "^${env_name} " | awk '{print $2}')
+        
+        if [[ -z "$env_path" ]]; then
+            echo "[ERROR] Could not determine path for environment $env_name"
+            echo "[DEBUG] Checking with: /home/$target_user/$distribution/bin/conda env list"
+            return 1
+        fi
     fi
     
-    echo "[INFO] Environment path: $env_path"
+    echo "[INFO] Container will use path: $env_path"
     
     # Create directories in target user's home
     sudo -u "$target_user" mkdir -p "/home/$target_user/environments" "/home/$target_user/ymls"
@@ -155,55 +159,65 @@ create_apptainer_container() {
     local yml_file="/home/$target_user/ymls/${env_name}_environment.yml"
     echo "[INFO] Exporting environment to: $yml_file"
     
-    if ! sudo -i -u "$target_user" bash -c "conda env export -n $env_name > ~/ymls/${env_name}_environment.yml" 2>/dev/null; then
+    if ! sudo -i -u "$target_user" bash -c "/home/$target_user/$distribution/bin/conda env export -n $env_name > /home/$target_user/ymls/${env_name}_environment.yml" 2>&1; then
         echo "[ERROR] Failed to export environment $env_name"
+        echo "[DEBUG] Tried to export from: /home/$target_user/$distribution/bin/conda"
         return 1
     fi
+    
+    echo "[SUCCESS] Environment exported to: $yml_file"
+    
+    # Remove the prefix line from the YAML to avoid conflicts with -p flag
+    echo "[INFO] Removing prefix from YAML file..."
+    sudo sed -i '/^prefix:/d' "$yml_file"
     
     # Create .def file
     local def_file="/home/$target_user/environments/${env_name}.def"
     echo "[INFO] Creating definition file: $def_file"
     
-    sudo bash -c "cat > '$def_file' << 'EOF'
+    # Create .def file directly with variables
+    cat << DEFEOF | sudo tee "$def_file" > /dev/null
 Bootstrap: docker
 From: continuumio/miniconda3
 
 %help
-    Apptainer container with conda environment \"${env_name}\"
+    Apptainer container with conda environment "${env_name}"
     Original environment path: ${env_path}
 
 %files
-    ymls/${env_name}_environment.yml /opt/environment.yml
+    /home/$target_user/ymls/${env_name}_environment.yml /opt/environment.yml
 
 %post
-    echo \"Creating conda environment at original path: ${env_path}\"
+    echo "Creating conda environment at original path: ${env_path}"
     
-    # Create directory structure matching original path
-    mkdir -p \"\$(dirname \"${env_path}\")\"
+    # Create parent directory structure (but not the env directory itself)
+    mkdir -p "\$(dirname ${env_path})"
     
-    # Create environment at the same path as original
-    /opt/conda/bin/conda env create -f /opt/environment.yml -p \"${env_path}\"
+    # Remove the environment directory if it exists (to ensure clean creation)
+    rm -rf ${env_path}
     
-    echo \"Cleaning cache\"
+    # Create environment at the original path
+    /opt/conda/bin/conda env create -f /opt/environment.yml -p ${env_path}
+    
+    echo "Cleaning cache"
     /opt/conda/bin/conda clean -afy
 
 %environment
-    export PATH=${env_path}/bin:/opt/conda/bin:\\\$PATH
+    export PATH=${env_path}/bin:/opt/conda/bin:\$PATH
     export CONDA_DEFAULT_ENV=${env_name}
     export CONDA_PREFIX=${env_path}
 
 %runscript
     #!/bin/bash
     source /opt/conda/etc/profile.d/conda.sh
-    conda activate \"${env_path}\"
+    conda activate ${env_path}
     
-    if [ \\\$# -eq 0 ]; then
+    if [ \$# -eq 0 ]; then
         exec /bin/bash
     else
-        exec \"\\\$@\"
+        exec "\$@"
     fi
-EOF
-"
+DEFEOF
     
     # Set ownership
     sudo chown "$target_user:$target_user" "$def_file"
@@ -212,23 +226,18 @@ EOF
     local sif_file="/home/$target_user/environments/${env_name}.sif"
     echo "[INFO] Building container: $sif_file"
     echo "[INFO] This may take several minutes..."
-    echo "[INFO] Building from: /home/$target_user"
+    echo "[INFO] Building with absolute paths"
     
-    # Change to target user's home directory for building
-    cd "/home/$target_user" || {
-        echo "[ERROR] Cannot change to /home/$target_user"
-        return 1
-    }
-    
-    if sudo apptainer build "environments/${env_name}.sif" "environments/${env_name}.def" 2>&1 | tee "/tmp/apptainer_build_${env_name}.log"; then
+    # Build with absolute paths
+    if sudo apptainer build "$sif_file" "$def_file" 2>&1 | tee "/tmp/apptainer_build_${env_name}.log"; then
         echo "[SUCCESS] Container created: $sif_file"
         sudo chown "$target_user:$target_user" "$sif_file"
-        cd - > /dev/null
         return 0
     else
         echo "[ERROR] Failed to build container for $env_name"
         echo "[INFO] Check log: /tmp/apptainer_build_${env_name}.log"
-        cd - > /dev/null
+        echo "[DEBUG] .def file: $def_file"
+        echo "[DEBUG] .yml file: $yml_file"
         return 1
     fi
 }
@@ -366,6 +375,10 @@ for ENV_NAME in $ENVS; do
         fi
     fi
     
+    # Get original environment path before cloning
+    ORIGINAL_ENV_PATH=$("$CONDA" env list | grep "^${ENV_NAME} " | awk '{print $2}')
+    echo "[INFO] Original environment path: $ORIGINAL_ENV_PATH"
+    
     # Export environment to YAML
     YML_FILE="$TEMP_DIR/${ENV_NAME}_environment.yml"
     echo "[INFO] Exporting $ENV_NAME to YAML..."
@@ -393,9 +406,9 @@ for ENV_NAME in $ENVS; do
         echo "[SUCCESS] Environment '$ENV_NAME' cloned successfully!"
         SUCCESS=$((SUCCESS + 1))
         
-        # Always create Apptainer container
+        # Always create Apptainer container with original path
         echo "[INFO] Creating Apptainer container for $ENV_NAME..."
-        if create_apptainer_container "$ENV_NAME" "$TARGET_USER" "$DISTRIBUTION"; then
+        if create_apptainer_container "$ENV_NAME" "$TARGET_USER" "$DISTRIBUTION" "$ORIGINAL_ENV_PATH"; then
             CONTAINERS_CREATED=$((CONTAINERS_CREATED + 1))
         else
             CONTAINERS_FAILED=$((CONTAINERS_FAILED + 1))
@@ -451,8 +464,6 @@ if [[ $SUCCESS -gt 0 ]]; then
         echo "       sudo -i -u $TARGET_USER"
         echo "       ./environments/<env_name>.sif <command>"
         echo ""
-        echo "[EXAMPLE] For muscle-env:"
-        echo "       ./environments/muscle-env.sif muscle -version"
     fi
 fi
 
