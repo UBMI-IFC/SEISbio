@@ -6,12 +6,11 @@ DISTRIBUTION="miniforge"
 MANAGER="mamba"
 SELECTED_ENV=""
 TEMP_DIR="/tmp/seisbio_clone_$$"
-CREATE_CONTAINER=true
 
 # Function to display usage
 usage() {
     echo "Usage: $0 [OPTIONS]"
-    echo "Clone conda environments from current user to seisbio user"
+    echo "Clone conda environments from current user to seisbio user and create Apptainer containers"
     echo ""
     echo "Options:"
     echo "  -e, --env <name>              Clone only the specified environment"
@@ -20,6 +19,9 @@ usage() {
     echo "  -m, --manager <name>          Package manager (mamba/conda) [default: auto-detect]"
     echo "  -h, --help                    Display this help message and exit"
     echo ""
+    echo "Examples:"
+    echo "  $0 -e muscle-env              # Clone muscle-env and create container"
+    echo "  $0                            # Clone all environments and create containers"
        exit 1
 }
 
@@ -41,9 +43,6 @@ while [[ "$#" -gt 0 ]]; do
         -m|--manager)
             MANAGER="$2"
             shift
-            ;;
-        --no-container)
-            CREATE_CONTAINER=false
             ;;
         -h|--help)
             usage
@@ -165,58 +164,71 @@ create_apptainer_container() {
     local def_file="/home/$target_user/environments/${env_name}.def"
     echo "[INFO] Creating definition file: $def_file"
     
-    sudo -u "$target_user" cat > "$def_file" << EOF
+    sudo bash -c "cat > '$def_file' << 'EOF'
 Bootstrap: docker
 From: continuumio/miniconda3
 
 %help
-    Apptainer container with conda environment "${env_name}"
+    Apptainer container with conda environment \"${env_name}\"
     Original environment path: ${env_path}
 
 %files
     ymls/${env_name}_environment.yml /opt/environment.yml
 
 %post
-    echo "Creating conda environment at original path: ${env_path}"
+    echo \"Creating conda environment at original path: ${env_path}\"
     
     # Create directory structure matching original path
-    mkdir -p "$(dirname "${env_path}")"
+    mkdir -p \"\$(dirname \"${env_path}\")\"
     
     # Create environment at the same path as original
-    /opt/conda/bin/conda env create -f /opt/environment.yml -p "${env_path}"
+    /opt/conda/bin/conda env create -f /opt/environment.yml -p \"${env_path}\"
     
-    echo "Cleaning cache"
+    echo \"Cleaning cache\"
     /opt/conda/bin/conda clean -afy
 
 %environment
-    export PATH=${env_path}/bin:/opt/conda/bin:\$PATH
+    export PATH=${env_path}/bin:/opt/conda/bin:\\\$PATH
     export CONDA_DEFAULT_ENV=${env_name}
     export CONDA_PREFIX=${env_path}
 
 %runscript
     #!/bin/bash
     source /opt/conda/etc/profile.d/conda.sh
-    conda activate "${env_path}"
+    conda activate \"${env_path}\"
     
-    if [ \$# -eq 0 ]; then
+    if [ \\\$# -eq 0 ]; then
         exec /bin/bash
     else
-        exec "\$@"
+        exec \"\\\$@\"
     fi
 EOF
+"
+    
+    # Set ownership
+    sudo chown "$target_user:$target_user" "$def_file"
     
     # Build container
     local sif_file="/home/$target_user/environments/${env_name}.sif"
     echo "[INFO] Building container: $sif_file"
     echo "[INFO] This may take several minutes..."
+    echo "[INFO] Building from: /home/$target_user"
     
-    if sudo apptainer build "$sif_file" "$def_file" 2>&1 | tee "/tmp/apptainer_build_${env_name}.log"; then
+    # Change to target user's home directory for building
+    cd "/home/$target_user" || {
+        echo "[ERROR] Cannot change to /home/$target_user"
+        return 1
+    }
+    
+    if sudo apptainer build "environments/${env_name}.sif" "environments/${env_name}.def" 2>&1 | tee "/tmp/apptainer_build_${env_name}.log"; then
         echo "[SUCCESS] Container created: $sif_file"
         sudo chown "$target_user:$target_user" "$sif_file"
+        cd - > /dev/null
         return 0
     else
         echo "[ERROR] Failed to build container for $env_name"
         echo "[INFO] Check log: /tmp/apptainer_build_${env_name}.log"
+        cd - > /dev/null
         return 1
     fi
 }
@@ -381,13 +393,12 @@ for ENV_NAME in $ENVS; do
         echo "[SUCCESS] Environment '$ENV_NAME' cloned successfully!"
         SUCCESS=$((SUCCESS + 1))
         
-        # Create Apptainer container if requested
-        if [[ "$CREATE_CONTAINER" == "true" ]]; then
-            if create_apptainer_container "$ENV_NAME" "$TARGET_USER" "$DISTRIBUTION"; then
-                CONTAINERS_CREATED=$((CONTAINERS_CREATED + 1))
-            else
-                CONTAINERS_FAILED=$((CONTAINERS_FAILED + 1))
-            fi
+        # Always create Apptainer container
+        echo "[INFO] Creating Apptainer container for $ENV_NAME..."
+        if create_apptainer_container "$ENV_NAME" "$TARGET_USER" "$DISTRIBUTION"; then
+            CONTAINERS_CREATED=$((CONTAINERS_CREATED + 1))
+        else
+            CONTAINERS_FAILED=$((CONTAINERS_FAILED + 1))
         fi
     else
         echo "[ERROR] Failed to create environment $ENV_NAME in $TARGET_USER"
@@ -414,11 +425,9 @@ echo "Total environments processed: $TOTAL"
 echo "Successfully cloned: $SUCCESS"
 echo "Failed: $FAILED"
 echo "Skipped: $SKIPPED"
-if [[ "$CREATE_CONTAINER" == "true" ]]; then
-    echo "-----------------------------------"
-    echo "Containers created: $CONTAINERS_CREATED"
-    echo "Containers failed: $CONTAINERS_FAILED"
-fi
+echo "-----------------------------------"
+echo "Containers created: $CONTAINERS_CREATED"
+echo "Containers failed: $CONTAINERS_FAILED"
 echo "====================================="
 echo ""
 
@@ -428,10 +437,15 @@ if [[ $SUCCESS -gt 0 ]]; then
     echo "       sudo -i -u $TARGET_USER"
     echo "       conda env list"
     
-    if [[ "$CREATE_CONTAINER" == "true" && $CONTAINERS_CREATED -gt 0 ]]; then
+    if [[ $CONTAINERS_CREATED -gt 0 ]]; then
         echo ""
         echo "[INFO] Apptainer containers available in:"
         echo "       /home/$TARGET_USER/environments/"
+        echo ""
+        echo "[INFO] Container files created:"
+        echo "       - /home/$TARGET_USER/ymls/<env>_environment.yml"
+        echo "       - /home/$TARGET_USER/environments/<env>.def"
+        echo "       - /home/$TARGET_USER/environments/<env>.sif"
         echo ""
         echo "[INFO] To test a container, run:"
         echo "       sudo -i -u $TARGET_USER"
