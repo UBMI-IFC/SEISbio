@@ -43,6 +43,56 @@ After running `install_seisbio.sh`:
 - Virtual environments created in `/home/seisbio/miniforge/envs/` (one per tool)
 - Conda initialized in `/etc/bash.bashrc` (accessible to all users)
 
+## Alternative: Cloning Existing Environments
+
+### Description of `cloner.sh` script
+
+If you already have conda environments installed in your local user and want to clone them to the `seisbio` user instead of creating them from scratch, you can use the `cloner.sh` script.
+
+**What it does:**
+1. **Auto-detects**: Automatically detects your conda distribution (miniforge/miniconda) and package manager (mamba/conda)
+2. **Exports environments**: Exports your existing conda environments to YAML files
+3. **Clones to seisbio**: Recreates those environments in the `seisbio` user
+4. **Handles duplicates**: Asks before overwriting existing environments
+5. **Provides statistics**: Shows summary of successful, failed, and skipped clones
+
+### Usage of cloner.sh
+
+**Clone all your environments to seisbio:**
+```bash
+./cloner.sh
+```
+
+**Clone a specific environment:**
+```bash
+./cloner.sh -e fastqc-env
+```
+
+**Clone to a different user:**
+```bash
+./cloner.sh -u myuser
+```
+
+**Force specific distribution and manager:**
+```bash
+./cloner.sh -d miniconda -m conda
+```
+
+**View help:**
+```bash
+./cloner.sh -h
+```
+
+### Cloner Options
+
+- `-e, --env <name>`: Clone only the specified environment
+- `-u, --user <name>`: Target user to clone environments to [default: seisbio]
+- `-d, --distribution <name>`: Distribution name (miniforge/miniconda) [default: auto-detected]
+- `-m, --manager <name>`: Package manager (mamba/conda) [default: auto-detected]
+- `-h, --help`: Display help message
+
+**Note:** This is an alternative to creating environments from scratch with `install_seisbio.sh`. Use `cloner.sh` when you want to replicate your existing setup in the seisbio user.
+
 ## Transition: Environment Preparation
 
 ### Description of `seisbio.sh` script
