@@ -6,7 +6,7 @@ DISTRIBUTION="miniforge"
 MANAGER="mamba"
 SELECTED_ENV=""
 TEMP_DIR="/tmp/seisbio_clone_$$"
-CREATE_CONTAINER=false
+CREATE_CONTAINER=true
 
 # Function to display usage
 usage() {
@@ -18,7 +18,6 @@ usage() {
     echo "  -u, --user <name>             Target user to clone environments to [default: seisbio]"
     echo "  -d, --distribution <name>     Distribution name (miniforge/miniconda) [default: auto-detect]"
     echo "  -m, --manager <name>          Package manager (mamba/conda) [default: auto-detect]"
-    echo "  -c, --container               Create Apptainer container after cloning"
     echo "  -h, --help                    Display this help message and exit"
     echo ""
        exit 1
@@ -43,8 +42,8 @@ while [[ "$#" -gt 0 ]]; do
             MANAGER="$2"
             shift
             ;;
-        -c|--container)
-            CREATE_CONTAINER=true
+        --no-container)
+            CREATE_CONTAINER=false
             ;;
         -h|--help)
             usage
