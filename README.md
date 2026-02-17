@@ -47,14 +47,16 @@ After running `install_seisbio.sh`:
 
 ### Description of `cloner.sh` script
 
-If you already have conda environments installed in your local user and want to clone them to the `seisbio` user instead of creating them from scratch, you can use the `cloner.sh` script.
+If you already have conda environments installed in your local user and want to clone them to the `seisbio` user instead of creating them from scratch, you can use the `cloner.sh` script. This script not only clones the environments but also automatically creates portable Apptainer containers.
 
 **What it does:**
 1. **Auto-detects**: Automatically detects your conda distribution (miniforge/miniconda) and package manager (mamba/conda)
 2. **Exports environments**: Exports your existing conda environments to YAML files
 3. **Clones to seisbio**: Recreates those environments in the `seisbio` user
-4. **Handles duplicates**: Asks before overwriting existing environments
-5. **Provides statistics**: Shows summary of successful, failed, and skipped clones
+4. **Creates Apptainer containers**: Automatically generates `.def`, `.yml`, and `.sif` files for each environment
+5. **Preserves original paths**: Containers use the original environment paths for full compatibility
+6. **Handles duplicates**: Asks before overwriting existing environments
+7. **Provides statistics**: Shows summary of successful, failed, and skipped clones and containers
 
 ### Usage of cloner.sh
 
@@ -65,7 +67,7 @@ If you already have conda environments installed in your local user and want to 
 
 **Clone a specific environment:**
 ```bash
-./cloner.sh -e fastqc-env
+./cloner.sh -e test-env
 ```
 
 **Clone to a different user:**
@@ -91,7 +93,45 @@ If you already have conda environments installed in your local user and want to 
 - `-m, --manager <name>`: Package manager (mamba/conda) [default: auto-detected]
 - `-h, --help`: Display help message
 
-**Note:** This is an alternative to creating environments from scratch with `install_seisbio.sh`. Use `cloner.sh` when you want to replicate your existing setup in the seisbio user.
+### Cloner Results
+
+After running `cloner.sh`, the following files are created in `/home/seisbio/`:
+
+```
+ymls/
+├── <env_name>_environment.yml     # Exported conda environment configuration
+
+environments/
+├── <env_name>.def                 # Apptainer definition file
+└── <env_name>.sif                 # Ready-to-use portable container
+```
+
+### Using Cloned Containers
+
+The generated containers preserve the original environment paths and are fully functional:
+
+**Run commands directly:**
+```bash
+sudo -i -u seisbio
+./environments/test-env.sif python script.py
+./environments/test-env.sif bash -c 'conda list'
+```
+
+**Interactive session:**
+```bash
+./environments/test-env.sif
+# Now inside the container
+conda list
+python --version
+```
+
+**Check environment details:**
+```bash
+./environments/test-env.sif bash -c 'which python'
+./environments/test-env.sif bash -c 'echo $CONDA_PREFIX'
+```
+
+**Note:** This is an alternative to creating environments from scratch with `install_seisbio.sh`. Use `cloner.sh` when you want to replicate your existing setup in the seisbio user and automatically generate portable containers in a single step.
 
 ## Transition: Environment Preparation
 
