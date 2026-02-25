@@ -146,62 +146,73 @@ detect_pkg_manager() {
             UPDATE_CMD="apt-get update && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y"
             INSTALL_CMD="DEBIAN_FRONTEND=noninteractive apt-get install -y"
             PACKAGES="curl wget vim htop net-tools sudo iputils-ping dnsutils traceroute build-essential git"
+            SUDO_GROUP="sudo"
             ;;
         fedora)
             PKG_MGR="dnf"
             UPDATE_CMD="dnf upgrade -y"
             INSTALL_CMD="dnf install -y"
-            PACKAGES="vim curl wget git htop net-tools bind-utils gcc make python3 tar gzip unzip"
+            PACKAGES="vim curl wget git htop net-tools bind-utils gcc make python3 tar gzip unzip sudo"
             EXTRA_CMD="dnf groupinstall -y 'Development Tools' 2>/dev/null || true"
+            SUDO_GROUP="wheel"
             ;;
         centos|rockylinux|almalinux|oracle)
             PKG_MGR="dnf"
             UPDATE_CMD="dnf upgrade -y"
             INSTALL_CMD="dnf install -y"
-            PACKAGES="vim curl wget git htop net-tools bind-utils gcc make python3 tar gzip unzip"
+            PACKAGES="vim curl wget git htop net-tools bind-utils gcc make python3 tar gzip unzip sudo"
             EXTRA_CMD="dnf groupinstall -y 'Development Tools' 2>/dev/null || true"
+            SUDO_GROUP="wheel"
             ;;
         opensuse|suse)
             PKG_MGR="zypper"
             UPDATE_CMD="zypper refresh && zypper update -y"
             INSTALL_CMD="zypper install -y"
-            PACKAGES="vim curl wget git htop net-tools bind-utils gcc make python3 tar gzip unzip"
+            PACKAGES="vim curl wget git htop net-tools bind-utils gcc make python3 tar gzip unzip sudo"
+            SUDO_GROUP="wheel"
             ;;
         archlinux|arch)
             PKG_MGR="pacman"
             UPDATE_CMD="pacman -Syu --noconfirm"
             INSTALL_CMD="pacman -S --noconfirm"
-            PACKAGES="vim curl wget git htop net-tools bind-tools gcc make python3 traceroute"
+            PACKAGES="vim curl wget git htop net-tools bind-tools gcc make python3 traceroute sudo"
+            SUDO_GROUP="wheel"
             ;;
         alpine)
             PKG_MGR="apk"
             UPDATE_CMD="apk update && apk upgrade"
             INSTALL_CMD="apk add"
-            PACKAGES="vim curl wget git htop net-tools bind-tools gcc make python3 bash sudo"
+            # shadow provides useradd/usermod/chpasswd on Alpine
+            PACKAGES="vim curl wget git htop net-tools bind-tools gcc make python3 bash sudo shadow"
+            SUDO_GROUP="wheel"
             ;;
         voidlinux|void)
             PKG_MGR="xbps"
             UPDATE_CMD="xbps-install -Syu"
             INSTALL_CMD="xbps-install -y"
             PACKAGES="vim curl wget git htop net-tools bind-utils gcc make python3 bash sudo"
+            SUDO_GROUP="wheel"
             ;;
         gentoo)
             PKG_MGR="emerge"
             UPDATE_CMD="emaint --auto sync && emerge --update --deep --newuse @world"
             INSTALL_CMD="emerge"
-            PACKAGES="vim curl wget git htop net-tools"
+            PACKAGES="vim curl wget git htop net-tools app-admin/sudo"
+            SUDO_GROUP="wheel"
             ;;
         nixos)
             PKG_MGR="nix"
             UPDATE_CMD="nix-channel --update && nixos-rebuild switch"
             INSTALL_CMD="nix-env -iA nixos."
             PACKAGES=""
+            SUDO_GROUP="wheel"
             ;;
         *)
             PKG_MGR="unknown"
             UPDATE_CMD=""
             INSTALL_CMD=""
             PACKAGES=""
+            SUDO_GROUP="sudo"
             ;;
     esac
 }
@@ -540,6 +551,57 @@ fi
 set -e
 
 # ========================================
+# User Setup
+# ========================================
+print_title "User Setup"
+
+# Ensure sudo is installed (for distros that may not ship it)
+if [ "$internet_ok" = true ] && [ "$PKG_MGR" != "unknown" ] && [ "$PKG_MGR" != "nix" ]; then
+    if ! incus exec "$VM_NAME" -- which sudo &>/dev/null 2>&1; then
+        print_info "Installing sudo..."
+        incus exec "$VM_NAME" -- bash -c "$INSTALL_CMD sudo" 2>/dev/null || true
+    else
+        print_info "sudo already present"
+    fi
+fi
+
+# Uncomment wheel group in sudoers for distros that use wheel
+if [ "$SUDO_GROUP" = "wheel" ]; then
+    print_info "Enabling %wheel in /etc/sudoers..."
+    incus exec "$VM_NAME" -- bash -c \
+        "sed -i 's/^#[[:space:]]*%wheel[[:space:]]\+ALL=(ALL:ALL)[[:space:]]\+ALL/%wheel ALL=(ALL:ALL) ALL/' /etc/sudoers 2>/dev/null; \
+         sed -i 's/^#[[:space:]]*%wheel[[:space:]]\+ALL=(ALL)[[:space:]]\+ALL/%wheel ALL=(ALL) ALL/' /etc/sudoers 2>/dev/null" || true
+fi
+
+# Create user (Alpine uses busybox adduser; all others use useradd)
+print_info "Creating user 'user'..."
+if [ "$DISTRO" = "alpine" ]; then
+    incus exec "$VM_NAME" -- adduser -D -s /bin/bash user 2>/dev/null || true
+    incus exec "$VM_NAME" -- addgroup user wheel 2>/dev/null || true
+else
+    incus exec "$VM_NAME" -- useradd -m -s /bin/bash user 2>/dev/null || true
+    incus exec "$VM_NAME" -- usermod -a -G "$SUDO_GROUP" user 2>/dev/null || true
+fi
+
+# Set password via chpasswd (portable across all distros with shadow-utils)
+print_info "Setting password for 'user'..."
+incus exec "$VM_NAME" -- bash -c "echo 'user:yomerengues' | chpasswd" 2>/dev/null || \
+    incus exec "$VM_NAME" -- bash -c "echo 'yomerengues' | passwd --stdin user" 2>/dev/null || true
+
+print_info " User 'user' created (sudo group: $SUDO_GROUP, password: yomerengues)"
+
+# ========================================
+# Create Snapshot
+# ========================================
+print_title "Creating Snapshot"
+print_info "Creating 'clean' snapshot..."
+if incus snapshot create "$VM_NAME" clean 2>/dev/null; then
+    print_info " Snapshot 'clean' created"
+else
+    print_warning "Could not create snapshot 'clean' (may already exist)"
+fi
+
+# ========================================
 # Final Summary
 # ========================================
 echo ""
@@ -562,9 +624,17 @@ print_info "OS Information:"
 incus exec "$VM_NAME" -- cat /etc/os-release 2>/dev/null | grep -E "^(PRETTY_NAME|VERSION)" | head -3 || echo "  $DISTRO_IMAGE"
 
 echo ""
+print_info "User Account:"
+echo "  Username:  user"
+echo "  Password:  yomerengues"
+echo "  Group:     $SUDO_GROUP"
+echo "  Snapshot:  clean  (restore: incus restore $VM_NAME clean)"
+
+echo ""
 print_info "Quick Access:"
 echo "  incus shell $VM_NAME"
 echo "  incus exec $VM_NAME -- <command>"
+echo "  incus exec $VM_NAME -- su - user"
 
 echo ""
 print_info "Package Management ($PKG_MGR):"
