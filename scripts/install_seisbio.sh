@@ -225,7 +225,12 @@ arch_install_packages() {
     echo "[INFO] Installing AUR packages with yay"
     IFS=' ' read -r -a aur_pkgs_arr <<< "$aur_pkgs"
     for pkg in "${aur_pkgs_arr[@]}"; do
-        yay -S --needed --noconfirm "$pkg" || echo "[WARN] AUR package '$pkg' could not be installed, skipping."
+        if [[ -n "$SUDO_USER" ]]; then
+            sudo -u "$SUDO_USER" yay -S --needed --noconfirm "$pkg" || echo "[WARN] AUR package '$pkg' could not be installed, skipping."
+        else
+            echo "[WARN] yay cannot run as root and SUDO_USER is not set. Skipping AUR package: $pkg"
+            echo "[INFO] Run: yay -S --needed $pkg"
+        fi
     done
 }
 

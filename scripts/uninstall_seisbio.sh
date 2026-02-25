@@ -4,6 +4,7 @@
 
 USERNAME="seisbio"
 BASHRC_PATH="/etc/bash.bashrc"
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
 # Function to remove seisbio user
 
@@ -59,6 +60,73 @@ revert_bashrc_changes() {
 	fi
 }
 
+# Function to remove Debian/Ubuntu packages
+
+remove_debian_packages() {
+    local basic_file="$SCRIPT_DIR/../deb/basic_pkgs.txt"
+    local bioinfo_file="$SCRIPT_DIR/../deb/bioinfo_pkgs.txt"
+
+    for pkg_file in "$basic_file" "$bioinfo_file"; do
+        if [[ ! -f "$pkg_file" ]]; then
+            echo "[WARN] Package file not found: $pkg_file, skipping."
+            continue
+        fi
+        echo "[INFO] Removing packages listed in $pkg_file"
+        while IFS= read -r line; do
+            line=$(echo "$line" | xargs)
+            [[ -z "$line" || "$line" =~ ^# ]] && continue
+            apt remove -y "$line" 2>/dev/null || echo "[WARN] Could not remove package '$line', skipping."
+        done < "$pkg_file"
+    done
+    echo "[INFO] Running apt autoremove..."
+    apt autoremove -y
+}
+
+# Function to remove Arch/AUR packages
+
+remove_arch_packages() {
+    local arch_file="$SCRIPT_DIR/../arch/arch_pks.txt"
+    local aur_file="$SCRIPT_DIR/../arch/aur_pks.txt"
+
+    # Remove AUR packages first (with yay)
+    if command -v yay &> /dev/null; then
+        if [[ -f "$aur_file" ]]; then
+            echo "[INFO] Removing AUR packages listed in $aur_file"
+            local aur_pkgs
+            while IFS= read -r line; do
+                line=$(echo "$line" | xargs)
+                [[ -z "$line" || "$line" =~ ^# ]] && continue
+                aur_pkgs+=("$line")
+            done < "$aur_file"
+            for pkg in "${aur_pkgs[@]}"; do
+                if [[ -n "$SUDO_USER" ]]; then
+                    sudo -u "$SUDO_USER" yay -Rns --noconfirm "$pkg" 2>/dev/null || echo "[WARN] Could not remove AUR package '$pkg', skipping."
+                else
+                    yay -Rns --noconfirm "$pkg" 2>/dev/null || echo "[WARN] Could not remove AUR package '$pkg', skipping."
+                fi
+            done
+        fi
+    else
+        echo "[WARN] yay not found. Skipping AUR package removal."
+    fi
+
+    # Remove pacman packages
+    if [[ -f "$arch_file" ]]; then
+        echo "[INFO] Removing pacman packages listed in $arch_file"
+        local arch_pkgs=()
+        while IFS= read -r line; do
+            line=$(echo "$line" | xargs)
+            [[ -z "$line" || "$line" =~ ^# ]] && continue
+            arch_pkgs+=("$line")
+        done < "$arch_file"
+        for pkg in "${arch_pkgs[@]}"; do
+            pacman -Rns --noconfirm "$pkg" 2>/dev/null || echo "[WARN] Could not remove package '$pkg', skipping."
+        done
+    else
+        echo "[WARN] Arch packages file not found: $arch_file"
+    fi
+}
+
 # Function to remove containers and enviroments
 
 remove_containers() {
@@ -105,6 +173,30 @@ main() {
     
     echo ""
     
+    # Ask about debian packages removal if package files exist
+    if [[ -f "$SCRIPT_DIR/../deb/basic_pkgs.txt" ]] || [[ -f "$SCRIPT_DIR/../deb/bioinfo_pkgs.txt" ]]; then
+        read -p "Do you want to remove Debian/Ubuntu packages installed by SEISbio? (y/N): " answer_deb
+        if [[ "$answer_deb" == "y" || "$answer_deb" == "Y" ]]; then
+            echo "[INFO] Removing Debian/Ubuntu packages..."
+            remove_debian_packages
+        else
+            echo "[INFO] Skipping Debian/Ubuntu package removal."
+        fi
+        echo ""
+    fi
+
+    # Ask about arch packages removal if package files exist
+    if [[ -f "$SCRIPT_DIR/../arch/arch_pks.txt" ]] || [[ -f "$SCRIPT_DIR/../arch/aur_pks.txt" ]]; then
+        read -p "Do you want to remove Arch/AUR packages installed by SEISbio? (y/N): " answer_arch
+        if [[ "$answer_arch" == "y" || "$answer_arch" == "Y" ]]; then
+            echo "[INFO] Removing Arch/AUR packages..."
+            remove_arch_packages
+        else
+            echo "[INFO] Skipping Arch/AUR package removal."
+        fi
+        echo ""
+    fi
+
     # Remove containers and environments before removing user
     remove_containers
     
