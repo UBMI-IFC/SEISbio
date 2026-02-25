@@ -183,10 +183,16 @@ debian_install_bioinfo() {
     local bioinfo_pkgs=$(read_env_file "$bioinfo_file")
 
     echo "[INFO] Installing helping packages (Debian/Ubuntu)"
-    sudo apt install -y $basic_pkgs || { echo "[ERROR] Failed to install basic packages."; return 1; }
+    IFS=' ' read -r -a basic_pkgs_arr <<< "$basic_pkgs"
+    for pkg in "${basic_pkgs_arr[@]}"; do
+        sudo apt install -y "$pkg" || echo "[WARN] Package '$pkg' could not be installed, skipping."
+    done
 
     echo "[INFO] Installing Bioinformatic programs from repositories (Debian/Ubuntu)"
-    sudo apt install -y $bioinfo_pkgs || { echo "[ERROR] Failed to install bioinformatic packages."; return 1; }
+    IFS=' ' read -r -a bioinfo_pkgs_arr <<< "$bioinfo_pkgs"
+    for pkg in "${bioinfo_pkgs_arr[@]}"; do
+        sudo apt install -y "$pkg" || echo "[WARN] Package '$pkg' could not be installed, skipping."
+    done
 }
 
 # Function to install ArchLinux packages
@@ -200,7 +206,10 @@ arch_install_packages() {
     local arch_pkgs=$(read_env_file "$arch_file")
 
     echo "[INFO] Installing packages from official repositories (pacman)"
-    sudo pacman -S --needed --noconfirm $arch_pkgs || { echo "[ERROR] Failed to install pacman packages."; return 1; }
+    IFS=' ' read -r -a arch_pkgs_arr <<< "$arch_pkgs"
+    for pkg in "${arch_pkgs_arr[@]}"; do
+        sudo pacman -S --needed --noconfirm "$pkg" || echo "[WARN] Package '$pkg' could not be installed, skipping."
+    done
 
     echo "[INFO] Installing AUR packages"
     if ! command -v yay &> /dev/null; then
@@ -214,7 +223,10 @@ arch_install_packages() {
     local aur_pkgs=$(read_env_file "$aur_file")
 
     echo "[INFO] Installing AUR packages with yay"
-    yay -S --needed --noconfirm $aur_pkgs || { echo "[ERROR] Failed to install AUR packages."; return 1; }
+    IFS=' ' read -r -a aur_pkgs_arr <<< "$aur_pkgs"
+    for pkg in "${aur_pkgs_arr[@]}"; do
+        yay -S --needed --noconfirm "$pkg" || echo "[WARN] AUR package '$pkg' could not be installed, skipping."
+    done
 }
 
 # Function to download distribution installer
