@@ -19,7 +19,8 @@ HOME_DIR="seisbio"
 HOME_ID=1015
 DEBIAN_INSTALL=false
 DEB_UPGRADE=false
-ENV_FILE="../envs/virtual_envs.txt"
+ARCH_INSTALL=false
+ENV_FILE=""
 YML_FILE=""
 BASE_PACKAGES_FILE="../base/base_packages.txt"
 SKIP_BASE_PACKAGES=false
@@ -38,6 +39,9 @@ usage() {
     echo "  --debian                                  Install basic and bioinformatic packages from Debian/Ubuntu repositories."
     echo "                                            The lists of packages are specified in the dev directory in SEISbio root directory."
     echo "  --debupgrade                              If specified, UPDATE Debian/Ubuntu system."
+    echo "  --arch                                    Install packages from ArchLinux repositories (arch_pks.txt) and AUR (aur_pks.txt)."
+    echo "                                            The lists of packages are specified in the arch/ directory in SEISbio root directory."
+    echo "                                            WARNING: AUR packages require yay to be installed."
     echo "  -f, --envfile <file>                      File that specifies the virtual environments to create in SEISbio installation."
     echo "                                            [default: ./envs/virtual_envs.txt]. You can read the file specification in ./envs/virtual_envs.txt"
     echo " -y, --yml, --yaml <file>    	      YAML file (environment.yml format) that specifies a conda environment to install."
@@ -69,6 +73,9 @@ while [[ "$#" -gt 0 ]]; do
             ;;
         --debupgrade)
             DEB_UPGRADE=true
+            ;;
+        --arch)
+            ARCH_INSTALL=true
             ;;
         -f|--envfile)
             ENV_FILE="$2"
@@ -121,21 +128,25 @@ CURRENT_GID=$(id -g)
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
 # Resolve ENV_FILE_PATH intelligently
-if [[ "$ENV_FILE" == /* ]]; then
-    # Absolute path - use as is
-    ENV_FILE_PATH="$ENV_FILE"
-    echo "     ... from absolute path:"
-    echo "     ... $ENV_FILE_PATH"
-elif [[ "$ENV_FILE" == ../* ]] || [[ "$ENV_FILE" == ../envs/* ]]; then
-    # Relative to script directory
-    ENV_FILE_PATH="$SCRIPT_DIR/$ENV_FILE"
-    echo "     ... from path relative to script:"
-    echo "     ... $ENV_FILE_PATH"
+if [[ -n "$ENV_FILE" ]]; then
+    if [[ "$ENV_FILE" == /* ]]; then
+        # Absolute path - use as is
+        ENV_FILE_PATH="$ENV_FILE"
+        echo "     ... from absolute path:"
+        echo "     ... $ENV_FILE_PATH"
+    elif [[ "$ENV_FILE" == ../* ]] || [[ "$ENV_FILE" == ../envs/* ]]; then
+        # Relative to script directory
+        ENV_FILE_PATH="$SCRIPT_DIR/$ENV_FILE"
+        echo "     ... from path relative to script:"
+        echo "     ... $ENV_FILE_PATH"
+    else
+        # Relative to current working directory
+        ENV_FILE_PATH="$(pwd)/$ENV_FILE"
+        echo "     ... from current directory:"
+        echo "     ... $ENV_FILE_PATH"
+    fi
 else
-    # Relative to current working directory
-    ENV_FILE_PATH="$(pwd)/$ENV_FILE"
-    echo "     ... from current directory:"
-    echo "     ... $ENV_FILE_PATH"
+    ENV_FILE_PATH=""
 fi
 
 # Function to read package lists from file
@@ -161,8 +172,8 @@ debian_install_bioinfo() {
 
     if [[ "$upgrade" == "true" ]]; then
         echo "[INFO] Updating and upgrading system (Debian/Ubuntu)"
-        sudo apt update
-        sudo apt upgrade -y
+        sudo apt update || { echo "[ERROR] Failed to run apt update."; return 1; }
+        sudo apt upgrade -y || { echo "[ERROR] Failed to run apt upgrade."; return 1; }
     fi
 
     local basic_file="$SCRIPT_DIR/../deb/basic_pkgs.txt"
@@ -172,10 +183,38 @@ debian_install_bioinfo() {
     local bioinfo_pkgs=$(read_env_file "$bioinfo_file")
 
     echo "[INFO] Installing helping packages (Debian/Ubuntu)"
-    sudo apt install -y $basic_pkgs
+    sudo apt install -y $basic_pkgs || { echo "[ERROR] Failed to install basic packages."; return 1; }
 
     echo "[INFO] Installing Bioinformatic programs from repositories (Debian/Ubuntu)"
-    sudo apt install -y $bioinfo_pkgs
+    sudo apt install -y $bioinfo_pkgs || { echo "[ERROR] Failed to install bioinformatic packages."; return 1; }
+}
+
+# Function to install ArchLinux packages
+arch_install_packages() {
+    echo "[INFO] Installing packages from ArchLinux repositories."
+    echo "WARNING: Only for ArchLinux-based systems"
+
+    local arch_file="$SCRIPT_DIR/../arch/arch_pks.txt"
+    local aur_file="$SCRIPT_DIR/../arch/aur_pks.txt"
+
+    local arch_pkgs=$(read_env_file "$arch_file")
+
+    echo "[INFO] Installing packages from official repositories (pacman)"
+    sudo pacman -S --needed --noconfirm $arch_pkgs || { echo "[ERROR] Failed to install pacman packages."; return 1; }
+
+    echo "[INFO] Installing AUR packages"
+    if ! command -v yay &> /dev/null; then
+        echo "[WARN] yay is not installed. AUR packages cannot be installed."
+        echo "[WARN] Please install yay (https://github.com/Jguer/yay) and re-run with --arch to install AUR packages:"
+        echo "       $aur_file"
+        echo "[INFO] Skipping AUR package installation."
+        return 0
+    fi
+
+    local aur_pkgs=$(read_env_file "$aur_file")
+
+    echo "[INFO] Installing AUR packages with yay"
+    yay -S --needed --noconfirm $aur_pkgs || { echo "[ERROR] Failed to install AUR packages."; return 1; }
 }
 
 # Function to download distribution installer
@@ -485,6 +524,26 @@ verify_input_files() {
         fi
     fi
     
+    # Verify Arch package files if --arch specified
+    if [[ "$ARCH_INSTALL" == "true" ]]; then
+        local arch_file="$SCRIPT_DIR/../arch/arch_pks.txt"
+        local aur_file="$SCRIPT_DIR/../arch/aur_pks.txt"
+        
+        if [[ ! -f "$arch_file" ]]; then
+            echo "[ERROR] Arch packages file not found: $arch_file"
+            errors=$((errors + 1))
+        else
+            echo "[OK] Arch packages file found: $arch_file"
+        fi
+        
+        if [[ ! -f "$aur_file" ]]; then
+            echo "[ERROR] AUR packages file not found: $aur_file"
+            errors=$((errors + 1))
+        else
+            echo "[OK] AUR packages file found: $aur_file"
+        fi
+    fi
+    
     # Exit if any errors were found
     if [[ $errors -gt 0 ]]; then
         echo ""
@@ -575,9 +634,13 @@ main() {
             fi
         fi
 
-        echo "[INFO] virtual envs."
-        ENV_LIST=$(read_env_file "$ENV_FILE_PATH")
-        install_virtual_envs "$ENV_LIST" "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID"
+        if [[ -n "$ENV_FILE" ]]; then
+            echo "[INFO] virtual envs."
+            ENV_LIST=$(read_env_file "$ENV_FILE_PATH")
+            install_virtual_envs "$ENV_LIST" "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID"
+        else
+            echo "[INFO] No virtual environments file specified, skipping."
+        fi
         
         # Install YAML environment if specified
         if [[ -n "$YML_FILE" ]]; then
@@ -601,7 +664,12 @@ main() {
     echo "============ Installing as root"
     if [[ "$DEBIAN_INSTALL" == "true" ]]; then
         echo "[START] Installing system packages for Debian/Ubuntu."
-        debian_install_bioinfo "$DEB_UPGRADE"
+        debian_install_bioinfo "$DEB_UPGRADE" || { echo "[ERROR] Debian package installation failed."; exit 1; }
+    fi
+
+    if [[ "$ARCH_INSTALL" == "true" ]]; then
+        echo "[START] Installing system packages for ArchLinux."
+        arch_install_packages || { echo "[ERROR] Arch package installation failed."; exit 1; }
     fi
 
     # Creating seisbio user
@@ -692,9 +760,13 @@ main() {
         fi
     fi
 
-    echo "[INFO] virtual envs."
-    ENV_LIST=$(read_env_file "$ENV_FILE_PATH")
-    install_virtual_envs "$ENV_LIST" "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID"
+    if [[ -n "$ENV_FILE" ]]; then
+        echo "[INFO] virtual envs."
+        ENV_LIST=$(read_env_file "$ENV_FILE_PATH")
+        install_virtual_envs "$ENV_LIST" "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID"
+    else
+        echo "[INFO] No virtual environments file specified, skipping."
+    fi
     
     # Install YAML environment if specified
     if [[ -n "$YML_FILE" ]]; then
