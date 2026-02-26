@@ -594,6 +594,19 @@ main() {
         fi
         exit 0
     fi
+
+    # Check if ENV_FILE is specified and seisbio already exists -> only install envs
+    if [[ -n "$ENV_FILE" ]] && [[ -d "/home/$HOME_DIR" ]] && [[ -d "/home/$HOME_DIR/$DISTRIBUTION" ]]; then
+        echo "[INFO] Environment file specified and SEISbio installation detected."
+        echo "[INFO] Installing only virtual environments (no system recreation)."
+        echo "====================="
+
+        ENV_LIST=$(read_env_file "$ENV_FILE_PATH")
+        install_virtual_envs "$ENV_LIST" "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID"
+
+        echo "[END] Virtual environments installation completed."
+        exit 0
+    fi
     
     # If YAML specified but seisbio doesn't exist, warn and proceed with full installation
     if [[ -n "$YML_FILE" ]] && [[ ! -d "/home/$HOME_DIR/$DISTRIBUTION" ]]; then
