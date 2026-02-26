@@ -20,6 +20,7 @@ HOME_ID=1015
 DEBIAN_INSTALL=false
 DEB_UPGRADE=false
 ARCH_INSTALL=false
+AUR_INSTALL=false
 ENV_FILE=""
 YML_FILE=""
 BASE_PACKAGES_FILE="../base/base_packages.txt"
@@ -39,8 +40,10 @@ usage() {
     echo "  --debian                                  Install basic and bioinformatic packages from Debian/Ubuntu repositories."
     echo "                                            The lists of packages are specified in the dev directory in SEISbio root directory."
     echo "  --debupgrade                              If specified, UPDATE Debian/Ubuntu system."
-    echo "  --arch                                    Install packages from ArchLinux repositories (arch_pks.txt) and AUR (aur_pks.txt)."
-    echo "                                            The lists of packages are specified in the arch/ directory in SEISbio root directory."
+    echo "  --arch                                    Install packages from ArchLinux official repositories (arch_pks.txt)."
+    echo "                                            The list of packages is specified in the arch/ directory in SEISbio root directory."
+    echo "  --aur                                     Install AUR packages (aur_pks.txt)."
+    echo "                                            The list of packages is specified in the arch/ directory in SEISbio root directory."
     echo "                                            WARNING: AUR packages require yay to be installed."
     echo "  -f, --envfile <file>                      File that specifies the virtual environments to create in SEISbio installation."
     echo "                                            [default: ./envs/virtual_envs.txt]. You can read the file specification in ./envs/virtual_envs.txt"
@@ -76,6 +79,9 @@ while [[ "$#" -gt 0 ]]; do
             ;;
         --arch)
             ARCH_INSTALL=true
+            ;;
+        --aur)
+            AUR_INSTALL=true
             ;;
         -f|--envfile)
             ENV_FILE="$2"
@@ -197,13 +203,12 @@ debian_install_bioinfo() {
     done
 }
 
-# Function to install ArchLinux packages
+# Function to install ArchLinux packages from official repositories
 arch_install_packages() {
-    echo "[INFO] Installing packages from ArchLinux repositories."
+    echo "[INFO] Installing packages from ArchLinux official repositories."
     echo "WARNING: Only for ArchLinux-based systems"
 
     local arch_file="$SCRIPT_DIR/../arch/arch_pks.txt"
-    local aur_file="$SCRIPT_DIR/../arch/aur_pks.txt"
 
     local arch_pkgs=$(read_env_file "$arch_file")
 
@@ -212,11 +217,18 @@ arch_install_packages() {
     for pkg in "${arch_pkgs_arr[@]}"; do
         sudo pacman -S --needed --noconfirm "$pkg" || echo "[WARN] Package '$pkg' could not be installed, skipping."
     done
+}
 
-    echo "[INFO] Installing AUR packages"
+# Function to install AUR packages
+aur_install_packages() {
+    echo "[INFO] Installing AUR packages."
+    echo "WARNING: Only for ArchLinux-based systems"
+
+    local aur_file="$SCRIPT_DIR/../arch/aur_pks.txt"
+
     if ! command -v yay &> /dev/null; then
         echo "[WARN] yay is not installed. AUR packages cannot be installed."
-        echo "[WARN] Please install yay (https://github.com/Jguer/yay) and re-run with --arch to install AUR packages:"
+        echo "[WARN] Please install yay (https://github.com/Jguer/yay) and re-run with --aur to install AUR packages:"
         echo "       $aur_file"
         echo "[INFO] Skipping AUR package installation."
         return 0
@@ -546,7 +558,6 @@ verify_input_files() {
     # Verify Arch package files if --arch specified
     if [[ "$ARCH_INSTALL" == "true" ]]; then
         local arch_file="$SCRIPT_DIR/../arch/arch_pks.txt"
-        local aur_file="$SCRIPT_DIR/../arch/aur_pks.txt"
         
         if [[ ! -f "$arch_file" ]]; then
             echo "[ERROR] Arch packages file not found: $arch_file"
@@ -554,6 +565,11 @@ verify_input_files() {
         else
             echo "[OK] Arch packages file found: $arch_file"
         fi
+    fi
+    
+    # Verify AUR package files if --aur specified
+    if [[ "$AUR_INSTALL" == "true" ]]; then
+        local aur_file="$SCRIPT_DIR/../arch/aur_pks.txt"
         
         if [[ ! -f "$aur_file" ]]; then
             echo "[ERROR] AUR packages file not found: $aur_file"
@@ -702,6 +718,11 @@ main() {
     if [[ "$ARCH_INSTALL" == "true" ]]; then
         echo "[START] Installing system packages for ArchLinux."
         arch_install_packages || { echo "[ERROR] Arch package installation failed."; exit 1; }
+    fi
+
+    if [[ "$AUR_INSTALL" == "true" ]]; then
+        echo "[START] Installing AUR packages for ArchLinux."
+        aur_install_packages || { echo "[ERROR] AUR package installation failed."; exit 1; }
     fi
 
     # Creating seisbio user
