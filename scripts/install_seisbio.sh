@@ -23,7 +23,7 @@ ARCH_INSTALL=false
 ENV_FILE=""
 YML_FILE=""
 BASE_PACKAGES_FILE="../base/base_packages.txt"
-SKIP_BASE_PACKAGES=false
+INSTALL_BASE_PACKAGES=false
 LOCAL_INSTALL=false
 
 # Function to display usage
@@ -45,9 +45,9 @@ usage() {
     echo "  -f, --envfile <file>                      File that specifies the virtual environments to create in SEISbio installation."
     echo "                                            [default: ./envs/virtual_envs.txt]. You can read the file specification in ./envs/virtual_envs.txt"
     echo " -y, --yml, --yaml <file>    	      YAML file (environment.yml format) that specifies a conda environment to install."
-    echo "  -b, --base-packages <file>                File that specifies the base scientific packages to install."
-    echo "                                            [default: ./base/base_packages.txt]"
-    echo "  --skip-base                               Skip installation of base scientific packages."
+    echo "  -b, --base-packages [file]                Install base scientific packages. Optional: specify a custom file."
+    echo "                                            Without [file], uses the default: ./base/base_packages.txt"
+    echo "                                            Base packages are NOT installed unless this flag is used."
     echo "  --local                                   Prefers a local installation instead of a system wide installation. Does not need root access."
     echo "  -h, --help                                Display this help message and exit."
     exit 1
@@ -86,11 +86,12 @@ while [[ "$#" -gt 0 ]]; do
 	    shift
 	    ;;
         -b|--base-packages)
-            BASE_PACKAGES_FILE="$2"
-            shift
-            ;;
-        --skip-base)
-            SKIP_BASE_PACKAGES=true
+            INSTALL_BASE_PACKAGES=true
+            # File argument is optional: only consume next arg if it doesn't start with -
+            if [[ -n "${2:-}" && "${2:-}" != -* ]]; then
+                BASE_PACKAGES_FILE="$2"
+                shift
+            fi
             ;;
         --local)
             LOCAL_INSTALL=true
@@ -154,11 +155,12 @@ read_env_file() {
     local fname="$1"
     local pkg_list=()
     while IFS= read -r line; do
-        line=$(echo "$line" | xargs) # Trim whitespace
+        # Trim leading/trailing whitespace without using xargs (avoids quote issues)
+        line="${line#"${line%%[![:space:]]*}"}"
+        line="${line%"${line##*[![:space:]]}"}"
         if [[ -z "$line" || "$line" =~ ^# ]]; then
             continue
         fi
-        # For now, only single package per line is supported, similar to Python script
         pkg_list+=("$line")
     done < "$fname"
     echo "${pkg_list[@]}"
@@ -487,8 +489,8 @@ verify_input_files() {
         fi
     fi
     
-    # Verify BASE_PACKAGES_FILE if not skipping base packages
-    if [[ "$SKIP_BASE_PACKAGES" == "false" ]]; then
+    # Verify BASE_PACKAGES_FILE only if -b was specified
+    if [[ "$INSTALL_BASE_PACKAGES" == "true" ]]; then
         local base_pkg_path="$BASE_PACKAGES_FILE"
         # If relative path, prepend SCRIPT_DIR
         if [[ "$BASE_PACKAGES_FILE" != /* ]]; then
@@ -502,7 +504,7 @@ verify_input_files() {
             echo "[OK] Base packages file found: $base_pkg_path"
         fi
     else
-        echo "[INFO] Skipping base packages verification (--skip-base specified)"
+        echo "[INFO] Base packages installation skipped (use -b to enable)"
     fi
     
     # Verify YML_FILE if specified
@@ -641,11 +643,11 @@ main() {
             if [[ "$ANSWER_INSTALLED" == "y" ]]; then
                 echo "[INFO] Updating anaconda and installing basic packages."
                 update_distribution "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID"
-                if [[ "$SKIP_BASE_PACKAGES" == "false" ]]; then
-                    echo "[INFO] Installing scientific packages."
+                if [[ "$INSTALL_BASE_PACKAGES" == "true" ]]; then
+                    echo "[INFO] Installing base scientific packages."
                     install_distribution_base "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID" "$BASE_PACKAGES_FILE"
                 else
-                    echo "[INFO] Skipping base packages installation (--skip-base specified)."
+                    echo "[INFO] Skipping base packages installation (use -b to enable)."
                 fi
             elif [[ "$ANSWER_INSTALLED" == "n" ]]; then
                 echo "[INFO] Continue with envs installation!"
@@ -656,11 +658,11 @@ main() {
         else
             echo "[INFO] Updating anaconda and installing basic packages."
             update_distribution "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID"
-            if [[ "$SKIP_BASE_PACKAGES" == "false" ]]; then
+            if [[ "$INSTALL_BASE_PACKAGES" == "true" ]]; then
                 echo "[INFO] Installing base scientific packages."
                 install_distribution_base "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID" "$BASE_PACKAGES_FILE"
             else
-                echo "[INFO] Skipping base packages installation (--skip-base specified)."
+                echo "[INFO] Skipping base packages installation (use -b to enable)."
             fi
         fi
 
@@ -767,11 +769,11 @@ main() {
         if [[ "$ANSWER_INSTALLED" == "y" ]]; then
             echo "[INFO] Updating anaconda and installing basic packages."
             update_distribution "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID"
-            if [[ "$SKIP_BASE_PACKAGES" == "false" ]]; then
+            if [[ "$INSTALL_BASE_PACKAGES" == "true" ]]; then
                 echo "[INFO] Installing base scientific packages."
                 install_distribution_base "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID" "$BASE_PACKAGES_FILE"
             else
-                echo "[INFO] Skipping base packages installation (--skip-base specified)."
+                echo "[INFO] Skipping base packages installation (use -b to enable)."
             fi
         elif [[ "$ANSWER_INSTALLED" == "n" ]]; then
             echo "[INFO] Continue with envs installation!"
@@ -782,11 +784,11 @@ main() {
     else
         echo "[INFO] Updating anaconda and installing basic packages."
         update_distribution "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID"
-        if [[ "$SKIP_BASE_PACKAGES" == "false" ]]; then
+        if [[ "$INSTALL_BASE_PACKAGES" == "true" ]]; then
             echo "[INFO] Installing base scientific packages."
             install_distribution_base "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID" "$BASE_PACKAGES_FILE"
         else
-            echo "[INFO] Skipping base packages installation (--skip-base specified)."
+            echo "[INFO] Skipping base packages installation (use -b to enable)."
         fi
     fi
 
