@@ -126,6 +126,17 @@ elif [[ "$DISTRIBUTION" == "miniconda" ]]; then
     MANAGER="conda"
 fi
 
+# Auto-detect global bashrc path
+if [[ -f "/etc/bash/bashrc" ]]; then
+    GLOBAL_BASHRC="/etc/bash/bashrc"        # Gentoo
+elif [[ -f "/etc/bashrc" ]]; then
+    GLOBAL_BASHRC="/etc/bashrc"             # Fedora / RHEL / openSUSE
+elif [[ -f "/etc/bash.bashrc" ]]; then
+    GLOBAL_BASHRC="/etc/bash.bashrc"        # Debian / Ubuntu / Arch
+else
+    GLOBAL_BASHRC="/etc/bash.bashrc"        # fallback
+fi
+
 # Get current user info
 CURRENT_USER=$(whoami)
 CURRENT_UID=$(id -u)
@@ -264,8 +275,7 @@ download_distribution() {
     fi
 
     echo "[INFO] Downloading $distribution installer from $url" >&2
-    # Use sudo -u to download as the target user
-    sudo -u "#$uid" wget -q -N "$url" -P "/home/$home" || { echo "[ERROR] Failed to download $distribution."; exit 1; }
+    sudo -u "$home" wget -q -N "$url" -P "/home/$home" || { echo "[ERROR] Failed to download $distribution."; exit 1; }
     echo "$url" | awk -F'/' '{print $NF}' # Return filename
 }
 
@@ -277,15 +287,13 @@ install_distribution() {
     local uid="$4"
 
     echo "[INFO] Installing $distribution to /home/$home/$distribution"
-    # Run installer as the target user
-    sudo -u "#$uid" bash "/home/$home/$installer" -b -p "/home/$home/$distribution" || { echo "[ERROR] Failed to install $distribution."; exit 1; }
+    sudo -u "$home" bash "/home/$home/$installer" -b -p "/home/$home/$distribution" || { echo "[ERROR] Failed to install $distribution."; exit 1; }
 
     echo "[INFO] Initializing conda for $distribution"
-    # Initialize conda as the target user
-    sudo -u "#$uid" "/home/$home/$distribution/bin/conda" init || { echo "[ERROR] Failed to initialize conda."; exit 1; }
+    sudo -u "$home" "/home/$home/$distribution/bin/conda" init || { echo "[ERROR] Failed to initialize conda."; exit 1; }
     
     echo "[INFO] Disabling automatic conda base activation"
-    sudo -u "#$uid" "/home/$home/$distribution/bin/conda" config --set auto_activate_base false || { echo "[ERROR] Failed to disable auto_activate_base."; exit 1; }
+    sudo -u "$home" "/home/$home/$distribution/bin/conda" config --set auto_activate_base false || { echo "[ERROR] Failed to disable auto_activate_base."; exit 1; }
 }
 
 # Function to update distribution
@@ -462,17 +470,18 @@ install_virtual_envs() {
     done
 }
 
-# Function to update /etc/bash.bashrc
+# Function to update global bashrc
 update_bashrc() {
     local home="$1"
     local distribution="$2"
 
-    echo "[INFO] Backing up /etc/bash.bashrc to /etc/bash.bashrc.backup"
-    sudo cp /etc/bash.bashrc /etc/bash.bashrc.backup || { echo "[ERROR] Failed to backup bash.bashrc."; exit 1; }
-    echo -e "\n\n# --- Backup of /bash.bashrc created\n# --- by SEISbio installation" | sudo tee -a /etc/bash.bashrc.backup > /dev/null
+    echo "[INFO] Detected global bashrc: $GLOBAL_BASHRC"
+    echo "[INFO] Backing up $GLOBAL_BASHRC to ${GLOBAL_BASHRC}.backup"
+    sudo cp "$GLOBAL_BASHRC" "${GLOBAL_BASHRC}.backup" || { echo "[ERROR] Failed to backup $GLOBAL_BASHRC."; exit 1; }
+    echo -e "\n\n# --- Backup of $GLOBAL_BASHRC created\n# --- by SEISbio installation" | sudo tee -a "${GLOBAL_BASHRC}.backup" > /dev/null
 
     echo "[INFO] Extracting conda initialization script from /home/$home/.bashrc"
-    local conda_text=$(sudo -u "#$HOME_ID" cat "/home/$home/.bashrc" | sed -n '/# >>> conda initialize >>>/,/# <<< conda initialize <<</p')
+    local conda_text=$(sudo -u "$home" cat "/home/$home/.bashrc" | sed -n '/# >>> conda initialize >>>/,/# <<< conda initialize <<</p')
 
     if [[ -z "$conda_text" ]]; then
         echo "[WARN] Something is wrong with /home/$home/.bashrc file! Could not find conda initialization block."
@@ -480,8 +489,8 @@ update_bashrc() {
         exit 1
     fi
 
-    echo "[INFO] Appending conda initialization to /etc/bash.bashrc"
-    echo -e "\n\n# --- Added by SEISbio\n$conda_text" | sudo tee -a /etc/bash.bashrc > /dev/null
+    echo "[INFO] Appending conda initialization to $GLOBAL_BASHRC"
+    echo -e "\n\n# --- Added by SEISbio\n$conda_text" | sudo tee -a "$GLOBAL_BASHRC" > /dev/null
 }
 
 # Function to verify input files before starting installation

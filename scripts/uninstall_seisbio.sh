@@ -3,10 +3,21 @@
 #Uninstallation of SEISbio
 
 USERNAME="seisbio"
-BASHRC_PATH="/etc/bash.bashrc"
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+
+# Auto-detect global bashrc path
+if [[ -f "/etc/bash/bashrc" ]]; then
+    BASHRC_PATH="/etc/bash/bashrc"      # Gentoo
+elif [[ -f "/etc/bashrc" ]]; then
+    BASHRC_PATH="/etc/bashrc"           # Fedora / RHEL / openSUSE
+elif [[ -f "/etc/bash.bashrc" ]]; then
+    BASHRC_PATH="/etc/bash.bashrc"      # Debian / Ubuntu / Arch
+else
+    BASHRC_PATH="/etc/bash.bashrc"      # fallback
+fi
+
 DISTRIBUTION="miniforge"
 LOCAL_UNINSTALL=false
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
 # Function to display usage
 usage() {
