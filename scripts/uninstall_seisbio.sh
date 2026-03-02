@@ -4,7 +4,42 @@
 
 USERNAME="seisbio"
 BASHRC_PATH="/etc/bash.bashrc"
+DISTRIBUTION="miniforge"
+LOCAL_UNINSTALL=false
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+
+# Function to display usage
+usage() {
+    echo "Usage: $0 [OPTIONS]"
+    echo "Uninstallation of SEISbio"
+    echo ""
+    echo "Options:"
+    echo "  --local                   Uninstall a local installation (current user). Does not need root access."
+    echo "  -d, --distribution <name> Distribution name to remove [default: miniforge]"
+    echo "  -h, --help                Display this help message and exit"
+    exit 1
+}
+
+# Parse arguments
+while [[ "$#" -gt 0 ]]; do
+    case "$1" in
+        --local)
+            LOCAL_UNINSTALL=true
+            ;;
+        -d|--distribution)
+            DISTRIBUTION="$2"
+            shift
+            ;;
+        -h|--help)
+            usage
+            ;;
+        *)
+            echo "Unknown parameter: $1"
+            usage
+            ;;
+    esac
+    shift
+done
 
 # Function to remove seisbio user
 
@@ -127,10 +162,35 @@ remove_arch_packages() {
     fi
 }
 
-# Function to remove containers and enviroments
+# Function to revert local ~/.bashrc changes
+revert_local_bashrc_changes() {
+    local bashrc_path="$HOME/.bashrc"
+    echo "[INFO] Attempting to revert conda block added by SEISbio in $bashrc_path"
+
+    if [[ ! -f "$bashrc_path" ]]; then
+        echo "[WARN] File not found: $bashrc_path. Nothing to revert."
+        return 0
+    fi
+
+    # Backup before modifying
+    cp "$bashrc_path" "${bashrc_path}.seisbio_backup" || {
+        echo "[ERROR] Failed to create backup of $bashrc_path"
+        return 1
+    }
+    echo "[INFO] Backup created: ${bashrc_path}.seisbio_backup"
+
+    if grep -q '# >>> conda initialize >>>' "$bashrc_path"; then
+        sed -i '/# >>> conda initialize >>>/,/# <<< conda initialize <<</d' "$bashrc_path"
+        echo "[INFO] Conda initialization block removed from $bashrc_path"
+    else
+        echo "[INFO] No conda initialization block found in $bashrc_path"
+    fi
+}
+
+# Function to remove containers and environments
 
 remove_containers() {
-	local home_dir="/home/$USERNAME"
+	local home_dir="$1"
 
 	if [[ -d "$home_dir/environments" ]]; then
 		echo "[INFO] Removing Apptainer containers from $home_dir/environments"
@@ -138,7 +198,7 @@ remove_containers() {
 		echo "[INFO] Containers removed."
 	fi
 
-	if [[ -d "$home_dir/ymls" ]]; then 
+	if [[ -d "$home_dir/ymls" ]]; then
 		echo "[INFO] Removing YAML files from $home_dir/ymls"
 		rm -rf "$home_dir/ymls"
 		echo "[INFO] YAML files removed"
@@ -147,17 +207,61 @@ remove_containers() {
 
 # Main function
 main() {
-    # Check if running as root
-    if [[ "$EUID" -ne 0 ]]; then
-        echo "[ERROR] This script must be run as root. Please use 'sudo'."
-        exit 1
-    fi
-    
     echo "====================================="
     echo "  SEISbio Uninstallation Script"
     echo "====================================="
     echo ""
-    
+
+    # ── LOCAL UNINSTALL ──────────────────────────────────────────────
+    if [[ "$LOCAL_UNINSTALL" == "true" ]]; then
+        LOCAL_HOME="$HOME"
+        DIST_PATH="$LOCAL_HOME/$DISTRIBUTION"
+
+        echo "[INFO] Local uninstall mode"
+        echo "[INFO] User: $(whoami)"
+        echo "[INFO] Distribution path: $DIST_PATH"
+        echo ""
+        echo "This will:"
+        echo "  - Remove $DIST_PATH"
+        echo "  - Remove Apptainer containers and YAML files from $LOCAL_HOME"
+        echo "  - Revert conda block from $LOCAL_HOME/.bashrc"
+        echo ""
+        read -p "Are you sure you want to uninstall SEISbio (local)? (y/N): " answer
+        if [[ "$answer" != "y" && "$answer" != "Y" ]]; then
+            echo "[INFO] Uninstallation cancelled."
+            exit 0
+        fi
+        echo ""
+
+        # Remove distribution
+        if [[ -d "$DIST_PATH" ]]; then
+            echo "[INFO] Removing $DIST_PATH ..."
+            rm -rf "$DIST_PATH"
+            echo "[INFO] $DISTRIBUTION removed."
+        else
+            echo "[WARN] $DIST_PATH not found. Nothing to remove."
+        fi
+
+        # Remove containers and YMLs
+        remove_containers "$LOCAL_HOME"
+
+        # Revert ~/.bashrc
+        revert_local_bashrc_changes
+
+        echo ""
+        echo "====================================="
+        echo "  Local uninstallation completed."
+        echo "====================================="
+        exit 0
+    fi
+
+    # ── SYSTEM-WIDE UNINSTALL ────────────────────────────────────────
+    if [[ "$EUID" -ne 0 ]]; then
+        echo "[ERROR] System-wide uninstallation must be run as root. Use 'sudo'."
+        echo "[INFO]  For a local installation, use: $0 --local"
+        exit 1
+    fi
+
     # Confirm with the user before proceeding
     echo "This will:"
     echo "  - Remove the '$USERNAME' user and their home directory"
@@ -165,14 +269,14 @@ main() {
     echo "  - Revert changes to $BASHRC_PATH"
     echo ""
     read -p "Are you sure you want to uninstall SEISbio? (y/N): " answer
-    
+
     if [[ "$answer" != "y" && "$answer" != "Y" ]]; then
         echo "[INFO] Uninstallation cancelled."
         exit 0
     fi
-    
+
     echo ""
-    
+
     # Ask about debian packages removal if package files exist
     if [[ -f "$SCRIPT_DIR/../deb/basic_pkgs.txt" ]] || [[ -f "$SCRIPT_DIR/../deb/bioinfo_pkgs.txt" ]]; then
         read -p "Do you want to remove Debian/Ubuntu packages installed by SEISbio? (y/N): " answer_deb
@@ -198,14 +302,14 @@ main() {
     fi
 
     # Remove containers and environments before removing user
-    remove_containers
-    
+    remove_containers "/home/$USERNAME"
+
     # Remove user
     remove_seisbio_user "$USERNAME"
-    
+
     # Revert bashrc changes
     revert_bashrc_changes "$BASHRC_PATH"
-    
+
     echo ""
     echo "====================================="
     echo "  Uninstallation process completed."
