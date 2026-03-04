@@ -272,6 +272,8 @@ if incus network list | grep -q incusbr0; then
     incus network set incusbr0 ipv6.address=none 2>/dev/null || true
     incus network set incusbr0 ipv6.nat=false 2>/dev/null || true
     incus network set incusbr0 dns.mode=managed 2>/dev/null || true
+    incus network set incusbr0 bridge.mtu=1450 2>/dev/null || true
+    incus network set incusbr0 bridge.driver=native 2>/dev/null || true
     print_info " incusbr0 updated"
 else
     print_info "Creating incusbr0..."
@@ -282,7 +284,9 @@ else
         ipv4.dhcp=true \
         ipv6.address=none \
         ipv6.nat=false \
-        dns.mode=managed
+        dns.mode=managed \
+        bridge.mtu=1450 \
+        bridge.driver=native
     print_info " incusbr0 created"
 fi
 
@@ -369,10 +373,10 @@ print_info " Image found (fingerprint: ${VM_FINGERPRINT:0:12})"
 # ========================================
 print_title "Creating $INSTANCE_LABEL"
 print_info "Creating $DISTRO_IMAGE $INSTANCE_LABEL '$VM_NAME'..."
-print_info "Using image fingerprint: ${VM_FINGERPRINT:0:12}"
+print_info "Using image: $IMAGE (verified fingerprint: ${VM_FINGERPRINT:0:12})"
 
 if [ "$INSTANCE_TYPE" = "vm" ]; then
-    incus init "images:$VM_FINGERPRINT" "$VM_NAME" --vm \
+    incus init "$IMAGE" "$VM_NAME" --vm \
         -c limits.cpu="$CPU_CORES" \
         -c limits.memory="$MEMORY"
 
@@ -384,7 +388,7 @@ if [ "$INSTANCE_TYPE" = "vm" ]; then
             ;;
     esac
 else
-    incus init "images:$VM_FINGERPRINT" "$VM_NAME" \
+    incus init "$IMAGE" "$VM_NAME" \
         -c limits.cpu="$CPU_CORES" \
         -c limits.memory="$MEMORY"
 fi
