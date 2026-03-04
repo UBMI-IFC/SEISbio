@@ -317,6 +317,16 @@ iptables -A FORWARD -i incusbr0 -j ACCEPT 2>/dev/null || true
 iptables -A FORWARD -o incusbr0 -j ACCEPT 2>/dev/null || true
 print_info " iptables FORWARD chain configured"
 
+# Fix TCP MSS clamping for MTU 1450 bridge (prevents large downloads from hanging)
+# Without this, Path MTU Discovery fails silently inside VMs: small packets work
+# but large transfers (e.g. miniforge/miniconda installers ~100MB) stall forever.
+# MSS = MTU(1450) - IP header(20) - TCP header(20) = 1410
+iptables -t mangle -C FORWARD -p tcp --tcp-flags SYN,RST SYN \
+    -j TCPMSS --set-mss 1410 2>/dev/null || \
+iptables -t mangle -A FORWARD -p tcp --tcp-flags SYN,RST SYN \
+    -j TCPMSS --set-mss 1410
+print_info " TCP MSS clamped to 1410 (MTU 1450 fix)"
+
 # Verify default profile
 if ! incus profile device list default | grep -q eth0; then
     incus profile device add default eth0 nic \
