@@ -195,9 +195,17 @@ detect_pkg_manager() {
             ;;
         gentoo)
             PKG_MGR="emerge"
-            UPDATE_CMD="emaint --auto sync && emerge --update --deep --newuse @world"
+            # NOTE: 'emerge --update --deep --newuse @world' is intentionally omitted.
+            # A full Gentoo world rebuild downloads several GB of source tarballs and
+            # compiles everything from source in parallel, saturating host bandwidth
+            # and CPU — which kills the host's internet connection.
+            # We only sync the Portage tree here; manual 'emerge @world' can be run later.
+            UPDATE_CMD="emaint --auto sync"
             INSTALL_CMD="emerge"
-            PACKAGES="vim curl wget git htop net-tools app-admin/sudo"
+            # Gentoo requires full category/package atoms (e.g. app-editors/vim, not just vim)
+            PACKAGES="app-editors/vim net-misc/curl net-misc/wget dev-vcs/git sys-process/htop net-analyzer/nettools app-admin/sudo"
+            # Limit parallel compile jobs to avoid saturating host CPU/bandwidth
+            EXTRA_CMD="mkdir -p /etc/portage && echo 'MAKEOPTS=\"-j2 -l2\"' >> /etc/portage/make.conf && echo 'EMERGE_DEFAULT_OPTS=\"--jobs=1 --load-average=2\"' >> /etc/portage/make.conf"
             SUDO_GROUP="wheel"
             ;;
         nixos)
