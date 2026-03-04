@@ -274,9 +274,39 @@ download_distribution() {
         url="$urls_miniconda"
     fi
 
+    local filename
+    filename=$(basename "$url")
+    local dest="/home/$home/$filename"
+
     echo "[INFO] Downloading $distribution installer from $url" >&2
-    sudo -u "$home" wget -q -o /dev/null --show-progress -N "$url" -P "/home/$home" || { echo "[ERROR] Failed to download $distribution."; exit 1; }
-    echo "$url" | awk -F'/' '{print $NF}' # Return filename
+
+    # Skip download if file already exists (wget -N behavior)
+    if [[ -f "$dest" ]]; then
+        echo "[INFO] Installer already present at $dest, skipping download." >&2
+        echo "$filename"
+        return 0
+    fi
+
+    # Prefer curl: --progress-bar (-#) reliably shows progress to stderr in
+    # non-TTY contexts (sudo -u, scripts, Incus VMs) without creating log files.
+    # -L follows redirects (needed for GitHub releases), -f fails on HTTP errors.
+    if command -v curl &>/dev/null; then
+        echo "[INFO] Using curl to download..." >&2
+        sudo -u "$home" curl -L -f --progress-bar -o "$dest" "$url" || {
+            echo "[ERROR] Failed to download $distribution (curl)."
+            exit 1
+        }
+    else
+        # Fallback to wget. -q -o /dev/null --show-progress works on most systems;
+        # on some distros (Fedora) --show-progress may be silenced in non-TTY shells.
+        echo "[INFO] curl not found, falling back to wget..." >&2
+        sudo -u "$home" wget -q -o /dev/null --show-progress -O "$dest" "$url" || {
+            echo "[ERROR] Failed to download $distribution (wget)."
+            exit 1
+        }
+    fi
+
+    echo "$filename"
 }
 
 # Function to install distribution
