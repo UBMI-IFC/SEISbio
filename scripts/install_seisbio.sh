@@ -275,9 +275,7 @@ download_distribution() {
     fi
 
     echo "[INFO] Downloading $distribution installer from $url" >&2
-    # --progress=dot:mega shows download progress (MB) even when not a TTY (e.g. inside Incus VMs)
-    # -q was removed because it suppressed all output, making it look like the script was hanging
-    sudo -u "$home" wget -N --progress=dot:mega "$url" -P "/home/$home" || { echo "[ERROR] Failed to download $distribution."; exit 1; }
+    sudo -u "$home" wget -q -o /dev/null --show-progress -N "$url" -P "/home/$home" || { echo "[ERROR] Failed to download $distribution."; exit 1; }
     echo "$url" | awk -F'/' '{print $NF}' # Return filename
 }
 
