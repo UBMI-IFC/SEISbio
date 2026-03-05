@@ -455,6 +455,55 @@ else
 fi
 
 # ========================================
+# Expand Root Filesystem to Full Disk Size
+# ========================================
+print_title "Expanding Root Filesystem"
+print_info "Ensuring root filesystem uses the full allocated disk ($DISK_SIZE)..."
+
+# Install growpart if not already present 
+print_info "Checking for growpart..."
+if ! incus exec "$VM_NAME" -- bash -c "command -v growpart &>/dev/null"; then
+    print_info "growpart not found, attempting to install..."
+    case "$PKG_MGR" in
+        dnf)    incus exec "$VM_NAME" -- bash -c "dnf install -y cloud-utils-growpart 2>/dev/null || true" ;;
+        apt)    incus exec "$VM_NAME" -- bash -c "apt-get install -y cloud-guest-utils 2>/dev/null || true" ;;
+        pacman) incus exec "$VM_NAME" -- bash -c "pacman -S --noconfirm cloud-utils 2>/dev/null || true" ;;
+        zypper) incus exec "$VM_NAME" -- bash -c "zypper install -y growpart 2>/dev/null || true" ;;
+        *)      print_warning "Cannot auto-install growpart for $PKG_MGR, skipping." ;;
+    esac
+else
+    print_info "growpart already available"
+fi
+
+# Detect root partition device and number (e.g. /dev/sda2 -> disk /dev/sda, part 2)
+ROOT_PART=$(incus exec "$VM_NAME" -- bash -c "df / | awk 'NR==2{print \$1}'")
+# Strip trailing partition number to get the disk device
+ROOT_DISK=$(echo "$ROOT_PART" | sed 's/p\?[0-9]*$//')
+PART_NUM=$(echo "$ROOT_PART" | grep -o '[0-9]*$')
+
+print_info "Root partition: $ROOT_PART  |  Disk: $ROOT_DISK  |  Part#: $PART_NUM"
+
+# Expand the partition table entry
+if incus exec "$VM_NAME" -- bash -c "command -v growpart &>/dev/null"; then
+    incus exec "$VM_NAME" -- bash -c "growpart $ROOT_DISK $PART_NUM 2>&1 || true"
+else
+    print_warning "growpart unavailable, skipping partition resize"
+fi
+
+# Expand the filesystem to fill the newly-sized partition
+FS_TYPE=$(incus exec "$VM_NAME" -- bash -c "df -T / | awk 'NR==2{print \$2}'")
+print_info "Filesystem type: $FS_TYPE"
+case "$FS_TYPE" in
+    xfs)   incus exec "$VM_NAME" -- bash -c "xfs_growfs /" ;;
+    ext4)  incus exec "$VM_NAME" -- bash -c "resize2fs $ROOT_PART" ;;
+    btrfs) incus exec "$VM_NAME" -- bash -c "btrfs filesystem resize max /" ;;
+    *)     print_warning "Unrecognised filesystem '$FS_TYPE', skipping resize" ;;
+esac
+
+NEW_SIZE=$(incus exec "$VM_NAME" -- bash -c "df -h / | awk 'NR==2{print \$2\" / \"\$4\" avail\"}'")
+print_info "Root filesystem after expansion: $NEW_SIZE"
+
+# ========================================
 # Wait for Network
 # ========================================
 print_title "Waiting for Network"
