@@ -633,6 +633,15 @@ if [ "$internet_ok" = true ] && [ "$PKG_MGR" != "unknown" ]; then
         incus exec "$VM_NAME" -- bash -c "$EXTRA_CMD"
     fi
 
+    # Masking tmp.mount makes /tmp use real disk space instead, removing the restriction.
+    if [ "$DISTRO" != "alpine" ] && [ "$DISTRO" != "voidlinux" ] && [ "$DISTRO" != "void" ] && [ "$DISTRO" != "gentoo" ]; then
+        if incus exec "$VM_NAME" -- bash -c "command -v systemctl &>/dev/null"; then
+            print_info "Disabling tmpfs on /tmp (fixes Apptainer nodev issue)..."
+            incus exec "$VM_NAME" -- bash -c "systemctl mask tmp.mount 2>/dev/null || true"
+            print_info " /tmp will use disk on next boot (no nodev restriction)"
+        fi
+    fi
+
     print_info " System configured"
 
 elif [ "$internet_ok" = true ] && [ "$PKG_MGR" = "unknown" ]; then
