@@ -494,10 +494,36 @@ fi
 FS_TYPE=$(incus exec "$VM_NAME" -- bash -c "df -T / | awk 'NR==2{print \$2}'")
 print_info "Filesystem type: $FS_TYPE"
 case "$FS_TYPE" in
-    xfs)   incus exec "$VM_NAME" -- bash -c "xfs_growfs /" ;;
-    ext4)  incus exec "$VM_NAME" -- bash -c "resize2fs $ROOT_PART" ;;
-    btrfs) incus exec "$VM_NAME" -- bash -c "btrfs filesystem resize max /" ;;
-    *)     print_warning "Unrecognised filesystem '$FS_TYPE', skipping resize" ;;
+    xfs)
+        if ! incus exec "$VM_NAME" -- bash -c "command -v xfs_growfs &>/dev/null"; then
+            print_info "Installing xfsprogs..."
+            case "$PKG_MGR" in
+                dnf)    incus exec "$VM_NAME" -- bash -c "dnf install -y xfsprogs 2>/dev/null || true" ;;
+                apt)    incus exec "$VM_NAME" -- bash -c "apt-get install -y xfsprogs 2>/dev/null || true" ;;
+                pacman) incus exec "$VM_NAME" -- bash -c "pacman -S --noconfirm xfsprogs 2>/dev/null || true" ;;
+                zypper) incus exec "$VM_NAME" -- bash -c "zypper install -y xfsprogs 2>/dev/null || true" ;;
+            esac
+        fi
+        incus exec "$VM_NAME" -- bash -c "xfs_growfs /"
+        ;;
+    ext4|ext3|ext2)
+        if ! incus exec "$VM_NAME" -- bash -c "command -v resize2fs &>/dev/null"; then
+            print_info "Installing e2fsprogs..."
+            case "$PKG_MGR" in
+                dnf)    incus exec "$VM_NAME" -- bash -c "dnf install -y e2fsprogs 2>/dev/null || true" ;;
+                apt)    incus exec "$VM_NAME" -- bash -c "apt-get install -y e2fsprogs 2>/dev/null || true" ;;
+                pacman) incus exec "$VM_NAME" -- bash -c "pacman -S --noconfirm e2fsprogs 2>/dev/null || true" ;;
+                zypper) incus exec "$VM_NAME" -- bash -c "zypper install -y e2fsprogs 2>/dev/null || true" ;;
+            esac
+        fi
+        incus exec "$VM_NAME" -- bash -c "resize2fs $ROOT_PART"
+        ;;
+    btrfs)
+        incus exec "$VM_NAME" -- bash -c "btrfs filesystem resize max /"
+        ;;
+    *)
+        print_warning "Unrecognised filesystem '$FS_TYPE', skipping resize"
+        ;;
 esac
 
 NEW_SIZE=$(incus exec "$VM_NAME" -- bash -c "df -h / | awk 'NR==2{print \$2\" / \"\$4\" avail\"}'")
