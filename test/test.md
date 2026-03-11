@@ -80,9 +80,6 @@ sudo pacman -S apptainer
 ### 5. Verify conda is in PATH
 
 ```bash
-# Reload shell environment
-source ~/.bashrc
-
 # Check conda is accessible
 conda --version
 
@@ -99,7 +96,7 @@ Create the example environment from the yml included in the repository, then run
 conda env list
 
 # Run cloner.sh targeting the example environment
-sudo bash scripts/cloner.sh -e muscle-env
+sudo scripts/cloner.sh -e muscle-env
 ```
 
 ### 7. Switch to the seisbio user
