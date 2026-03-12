@@ -203,15 +203,21 @@ debian_install_bioinfo() {
 
     echo "[INFO] Installing helping packages (Debian/Ubuntu)"
     IFS=' ' read -r -a basic_pkgs_arr <<< "$basic_pkgs"
-    for pkg in "${basic_pkgs_arr[@]}"; do
-        sudo apt install -y "$pkg" || echo "[WARN] Package '$pkg' could not be installed, skipping."
-    done
+    if ! sudo apt install -y "${basic_pkgs_arr[@]}"; then
+        echo "[WARN] Bulk install failed, retrying one by one to skip missing packages..."
+        for pkg in "${basic_pkgs_arr[@]}"; do
+            sudo apt install -y "$pkg" || echo "[WARN] Package '$pkg' could not be installed, skipping."
+        done
+    fi
 
     echo "[INFO] Installing Bioinformatic programs from repositories (Debian/Ubuntu)"
     IFS=' ' read -r -a bioinfo_pkgs_arr <<< "$bioinfo_pkgs"
-    for pkg in "${bioinfo_pkgs_arr[@]}"; do
-        sudo apt install -y "$pkg" || echo "[WARN] Package '$pkg' could not be installed, skipping."
-    done
+    if ! sudo apt install -y "${bioinfo_pkgs_arr[@]}"; then
+        echo "[WARN] Bulk install failed, retrying one by one to skip missing packages..."
+        for pkg in "${bioinfo_pkgs_arr[@]}"; do
+            sudo apt install -y "$pkg" || echo "[WARN] Package '$pkg' could not be installed, skipping."
+        done
+    fi
 }
 
 # Function to install ArchLinux packages from official repositories
@@ -225,9 +231,12 @@ arch_install_packages() {
 
     echo "[INFO] Installing packages from official repositories (pacman)"
     IFS=' ' read -r -a arch_pkgs_arr <<< "$arch_pkgs"
-    for pkg in "${arch_pkgs_arr[@]}"; do
-        sudo pacman -S --needed --noconfirm "$pkg" || echo "[WARN] Package '$pkg' could not be installed, skipping."
-    done
+    if ! sudo pacman -S --needed --noconfirm "${arch_pkgs_arr[@]}"; then
+        echo "[WARN] Bulk install failed, retrying one by one to skip missing packages..."
+        for pkg in "${arch_pkgs_arr[@]}"; do
+            sudo pacman -S --needed --noconfirm "$pkg" || echo "[WARN] Package '$pkg' could not be installed, skipping."
+        done
+    fi
 }
 
 # Function to install AUR packages
@@ -249,14 +258,17 @@ aur_install_packages() {
 
     echo "[INFO] Installing AUR packages with yay"
     IFS=' ' read -r -a aur_pkgs_arr <<< "$aur_pkgs"
-    for pkg in "${aur_pkgs_arr[@]}"; do
-        if [[ -n "$SUDO_USER" ]]; then
-            sudo -u "$SUDO_USER" yay -S --needed --noconfirm "$pkg" || echo "[WARN] AUR package '$pkg' could not be installed, skipping."
-        else
-            echo "[WARN] yay cannot run as root and SUDO_USER is not set. Skipping AUR package: $pkg"
-            echo "[INFO] Run: yay -S --needed $pkg"
+    if [[ -n "$SUDO_USER" ]]; then
+        if ! sudo -u "$SUDO_USER" yay -S --needed --noconfirm "${aur_pkgs_arr[@]}"; then
+            echo "[WARN] Bulk AUR install failed, retrying one by one to skip missing packages..."
+            for pkg in "${aur_pkgs_arr[@]}"; do
+                sudo -u "$SUDO_USER" yay -S --needed --noconfirm "$pkg" || echo "[WARN] AUR package '$pkg' could not be installed, skipping."
+            done
         fi
-    done
+    else
+        echo "[WARN] yay cannot run as root and SUDO_USER is not set. Skipping all AUR packages."
+        echo "[INFO] Run manually: yay -S --needed ${aur_pkgs_arr[*]}"
+    fi
 }
 
 # Function to download distribution installer
