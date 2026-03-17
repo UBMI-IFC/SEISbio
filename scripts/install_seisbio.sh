@@ -20,10 +20,11 @@ HOME_ID=1015
 DEBIAN_INSTALL=false
 DEB_UPGRADE=false
 ARCH_INSTALL=false
+AUR_INSTALL=false
 ENV_FILE=""
 YML_FILE=""
 BASE_PACKAGES_FILE="../base/base_packages.txt"
-SKIP_BASE_PACKAGES=false
+INSTALL_BASE_PACKAGES=false
 LOCAL_INSTALL=false
 
 # Function to display usage
@@ -39,15 +40,17 @@ usage() {
     echo "  --debian                                  Install basic and bioinformatic packages from Debian/Ubuntu repositories."
     echo "                                            The lists of packages are specified in the dev directory in SEISbio root directory."
     echo "  --debupgrade                              If specified, UPDATE Debian/Ubuntu system."
-    echo "  --arch                                    Install packages from ArchLinux repositories (arch_pks.txt) and AUR (aur_pks.txt)."
-    echo "                                            The lists of packages are specified in the arch/ directory in SEISbio root directory."
+    echo "  --arch                                    Install packages from ArchLinux official repositories (arch_pks.txt)."
+    echo "                                            The list of packages is specified in the arch/ directory in SEISbio root directory."
+    echo "  --aur                                     Install AUR packages (aur_pks.txt)."
+    echo "                                            The list of packages is specified in the arch/ directory in SEISbio root directory."
     echo "                                            WARNING: AUR packages require yay to be installed."
     echo "  -f, --envfile <file>                      File that specifies the virtual environments to create in SEISbio installation."
     echo "                                            [default: ./envs/virtual_envs.txt]. You can read the file specification in ./envs/virtual_envs.txt"
     echo " -y, --yml, --yaml <file>    	      YAML file (environment.yml format) that specifies a conda environment to install."
-    echo "  -b, --base-packages <file>                File that specifies the base scientific packages to install."
-    echo "                                            [default: ./base/base_packages.txt]"
-    echo "  --skip-base                               Skip installation of base scientific packages."
+    echo "  -b, --base-packages [file]                Install base scientific packages. Optional: specify a custom file."
+    echo "                                            Without [file], uses the default: ./base/base_packages.txt"
+    echo "                                            Base packages are NOT installed unless this flag is used."
     echo "  --local                                   Prefers a local installation instead of a system wide installation. Does not need root access."
     echo "  -h, --help                                Display this help message and exit."
     exit 1
@@ -77,6 +80,9 @@ while [[ "$#" -gt 0 ]]; do
         --arch)
             ARCH_INSTALL=true
             ;;
+        --aur)
+            AUR_INSTALL=true
+            ;;
         -f|--envfile)
             ENV_FILE="$2"
             shift
@@ -86,11 +92,12 @@ while [[ "$#" -gt 0 ]]; do
 	    shift
 	    ;;
         -b|--base-packages)
-            BASE_PACKAGES_FILE="$2"
-            shift
-            ;;
-        --skip-base)
-            SKIP_BASE_PACKAGES=true
+            INSTALL_BASE_PACKAGES=true
+            # File argument is optional: only consume next arg if it doesn't start with -
+            if [[ -n "${2:-}" && "${2:-}" != -* ]]; then
+                BASE_PACKAGES_FILE="$2"
+                shift
+            fi
             ;;
         --local)
             LOCAL_INSTALL=true
@@ -117,6 +124,17 @@ if [[ "$DISTRIBUTION" == "miniforge" ]]; then
     MANAGER="mamba"
 elif [[ "$DISTRIBUTION" == "miniconda" ]]; then
     MANAGER="conda"
+fi
+
+# Auto-detect global bashrc path
+if [[ -f "/etc/bash/bashrc" ]]; then
+    GLOBAL_BASHRC="/etc/bash/bashrc"        # Gentoo
+elif [[ -f "/etc/bashrc" ]]; then
+    GLOBAL_BASHRC="/etc/bashrc"             # Fedora / RHEL / openSUSE
+elif [[ -f "/etc/bash.bashrc" ]]; then
+    GLOBAL_BASHRC="/etc/bash.bashrc"        # Debian / Ubuntu / Arch
+else
+    GLOBAL_BASHRC="/etc/bash.bashrc"        # fallback
 fi
 
 # Get current user info
@@ -154,11 +172,12 @@ read_env_file() {
     local fname="$1"
     local pkg_list=()
     while IFS= read -r line; do
-        line=$(echo "$line" | xargs) # Trim whitespace
+        # Trim leading/trailing whitespace without using xargs (avoids quote issues)
+        line="${line#"${line%%[![:space:]]*}"}"
+        line="${line%"${line##*[![:space:]]}"}"
         if [[ -z "$line" || "$line" =~ ^# ]]; then
             continue
         fi
-        # For now, only single package per line is supported, similar to Python script
         pkg_list+=("$line")
     done < "$fname"
     echo "${pkg_list[@]}"
@@ -184,37 +203,52 @@ debian_install_bioinfo() {
 
     echo "[INFO] Installing helping packages (Debian/Ubuntu)"
     IFS=' ' read -r -a basic_pkgs_arr <<< "$basic_pkgs"
-    for pkg in "${basic_pkgs_arr[@]}"; do
-        sudo apt install -y "$pkg" || echo "[WARN] Package '$pkg' could not be installed, skipping."
-    done
+    if ! sudo apt install -y "${basic_pkgs_arr[@]}"; then
+        echo "[WARN] Bulk install failed, retrying one by one to skip missing packages..."
+        for pkg in "${basic_pkgs_arr[@]}"; do
+            sudo apt install -y "$pkg" || echo "[WARN] Package '$pkg' could not be installed, skipping."
+        done
+    fi
 
     echo "[INFO] Installing Bioinformatic programs from repositories (Debian/Ubuntu)"
     IFS=' ' read -r -a bioinfo_pkgs_arr <<< "$bioinfo_pkgs"
-    for pkg in "${bioinfo_pkgs_arr[@]}"; do
-        sudo apt install -y "$pkg" || echo "[WARN] Package '$pkg' could not be installed, skipping."
-    done
+    if ! sudo apt install -y "${bioinfo_pkgs_arr[@]}"; then
+        echo "[WARN] Bulk install failed, retrying one by one to skip missing packages..."
+        for pkg in "${bioinfo_pkgs_arr[@]}"; do
+            sudo apt install -y "$pkg" || echo "[WARN] Package '$pkg' could not be installed, skipping."
+        done
+    fi
 }
 
-# Function to install ArchLinux packages
+# Function to install ArchLinux packages from official repositories
 arch_install_packages() {
-    echo "[INFO] Installing packages from ArchLinux repositories."
+    echo "[INFO] Installing packages from ArchLinux official repositories."
     echo "WARNING: Only for ArchLinux-based systems"
 
     local arch_file="$SCRIPT_DIR/../arch/arch_pks.txt"
-    local aur_file="$SCRIPT_DIR/../arch/aur_pks.txt"
 
     local arch_pkgs=$(read_env_file "$arch_file")
 
     echo "[INFO] Installing packages from official repositories (pacman)"
     IFS=' ' read -r -a arch_pkgs_arr <<< "$arch_pkgs"
-    for pkg in "${arch_pkgs_arr[@]}"; do
-        sudo pacman -S --needed --noconfirm "$pkg" || echo "[WARN] Package '$pkg' could not be installed, skipping."
-    done
+    if ! sudo pacman -S --needed --noconfirm "${arch_pkgs_arr[@]}"; then
+        echo "[WARN] Bulk install failed, retrying one by one to skip missing packages..."
+        for pkg in "${arch_pkgs_arr[@]}"; do
+            sudo pacman -S --needed --noconfirm "$pkg" || echo "[WARN] Package '$pkg' could not be installed, skipping."
+        done
+    fi
+}
 
-    echo "[INFO] Installing AUR packages"
+# Function to install AUR packages
+aur_install_packages() {
+    echo "[INFO] Installing AUR packages."
+    echo "WARNING: Only for ArchLinux-based systems"
+
+    local aur_file="$SCRIPT_DIR/../arch/aur_pks.txt"
+
     if ! command -v yay &> /dev/null; then
         echo "[WARN] yay is not installed. AUR packages cannot be installed."
-        echo "[WARN] Please install yay (https://github.com/Jguer/yay) and re-run with --arch to install AUR packages:"
+        echo "[WARN] Please install yay (https://github.com/Jguer/yay) and re-run with --aur to install AUR packages:"
         echo "       $aur_file"
         echo "[INFO] Skipping AUR package installation."
         return 0
@@ -224,14 +258,17 @@ arch_install_packages() {
 
     echo "[INFO] Installing AUR packages with yay"
     IFS=' ' read -r -a aur_pkgs_arr <<< "$aur_pkgs"
-    for pkg in "${aur_pkgs_arr[@]}"; do
-        if [[ -n "$SUDO_USER" ]]; then
-            sudo -u "$SUDO_USER" yay -S --needed --noconfirm "$pkg" || echo "[WARN] AUR package '$pkg' could not be installed, skipping."
-        else
-            echo "[WARN] yay cannot run as root and SUDO_USER is not set. Skipping AUR package: $pkg"
-            echo "[INFO] Run: yay -S --needed $pkg"
+    if [[ -n "$SUDO_USER" ]]; then
+        if ! sudo -u "$SUDO_USER" yay -S --needed --noconfirm "${aur_pkgs_arr[@]}"; then
+            echo "[WARN] Bulk AUR install failed, retrying one by one to skip missing packages..."
+            for pkg in "${aur_pkgs_arr[@]}"; do
+                sudo -u "$SUDO_USER" yay -S --needed --noconfirm "$pkg" || echo "[WARN] AUR package '$pkg' could not be installed, skipping."
+            done
         fi
-    done
+    else
+        echo "[WARN] yay cannot run as root and SUDO_USER is not set. Skipping all AUR packages."
+        echo "[INFO] Run manually: yay -S --needed ${aur_pkgs_arr[*]}"
+    fi
 }
 
 # Function to download distribution installer
@@ -249,10 +286,39 @@ download_distribution() {
         url="$urls_miniconda"
     fi
 
+    local filename
+    filename=$(basename "$url")
+    local dest="/home/$home/$filename"
+
     echo "[INFO] Downloading $distribution installer from $url" >&2
-    # Use sudo -u to download as the target user
-    sudo -u "#$uid" wget -q -N "$url" -P "/home/$home" || { echo "[ERROR] Failed to download $distribution."; exit 1; }
-    echo "$url" | awk -F'/' '{print $NF}' # Return filename
+
+    # Skip download if file already exists (wget -N behavior)
+    if [[ -f "$dest" ]]; then
+        echo "[INFO] Installer already present at $dest, skipping download." >&2
+        echo "$filename"
+        return 0
+    fi
+
+    # Prefer curl: --progress-bar (-#) reliably shows progress to stderr in
+    # non-TTY contexts (sudo -u, scripts, Incus VMs) without creating log files.
+    # -L follows redirects (needed for GitHub releases), -f fails on HTTP errors.
+    if command -v curl &>/dev/null; then
+        echo "[INFO] Using curl to download..." >&2
+        sudo -u "$home" curl -L -f --progress-bar -o "$dest" "$url" || {
+            echo "[ERROR] Failed to download $distribution (curl)."
+            exit 1
+        }
+    else
+        # Fallback to wget. -q -o /dev/null --show-progress works on most systems;
+        # on some distros (Fedora) --show-progress may be silenced in non-TTY shells.
+        echo "[INFO] curl not found, falling back to wget..." >&2
+        sudo -u "$home" wget -q -o /dev/null --show-progress -O "$dest" "$url" || {
+            echo "[ERROR] Failed to download $distribution (wget)."
+            exit 1
+        }
+    fi
+
+    echo "$filename"
 }
 
 # Function to install distribution
@@ -263,15 +329,13 @@ install_distribution() {
     local uid="$4"
 
     echo "[INFO] Installing $distribution to /home/$home/$distribution"
-    # Run installer as the target user
-    sudo -u "#$uid" bash "/home/$home/$installer" -b -p "/home/$home/$distribution" || { echo "[ERROR] Failed to install $distribution."; exit 1; }
+    sudo -u "$home" bash "/home/$home/$installer" -b -p "/home/$home/$distribution" || { echo "[ERROR] Failed to install $distribution."; exit 1; }
 
     echo "[INFO] Initializing conda for $distribution"
-    # Initialize conda as the target user
-    sudo -u "#$uid" "/home/$home/$distribution/bin/conda" init || { echo "[ERROR] Failed to initialize conda."; exit 1; }
+    sudo -u "$home" "/home/$home/$distribution/bin/conda" init || { echo "[ERROR] Failed to initialize conda."; exit 1; }
     
     echo "[INFO] Disabling automatic conda base activation"
-    sudo -u "#$uid" "/home/$home/$distribution/bin/conda" config --set auto_activate_base false || { echo "[ERROR] Failed to disable auto_activate_base."; exit 1; }
+    sudo -u "$home" "/home/$home/$distribution/bin/conda" config --set auto_activate_base false || { echo "[ERROR] Failed to disable auto_activate_base."; exit 1; }
 }
 
 # Function to update distribution
@@ -448,17 +512,18 @@ install_virtual_envs() {
     done
 }
 
-# Function to update /etc/bash.bashrc
+# Function to update global bashrc
 update_bashrc() {
     local home="$1"
     local distribution="$2"
 
-    echo "[INFO] Backing up /etc/bash.bashrc to /etc/bash.bashrc.backup"
-    sudo cp /etc/bash.bashrc /etc/bash.bashrc.backup || { echo "[ERROR] Failed to backup bash.bashrc."; exit 1; }
-    echo -e "\n\n# --- Backup of /bash.bashrc created\n# --- by SEISbio installation" | sudo tee -a /etc/bash.bashrc.backup > /dev/null
+    echo "[INFO] Detected global bashrc: $GLOBAL_BASHRC"
+    echo "[INFO] Backing up $GLOBAL_BASHRC to ${GLOBAL_BASHRC}.backup"
+    sudo cp "$GLOBAL_BASHRC" "${GLOBAL_BASHRC}.backup" || { echo "[ERROR] Failed to backup $GLOBAL_BASHRC."; exit 1; }
+    echo -e "\n\n# --- Backup of $GLOBAL_BASHRC created\n# --- by SEISbio installation" | sudo tee -a "${GLOBAL_BASHRC}.backup" > /dev/null
 
     echo "[INFO] Extracting conda initialization script from /home/$home/.bashrc"
-    local conda_text=$(sudo -u "#$HOME_ID" cat "/home/$home/.bashrc" | sed -n '/# >>> conda initialize >>>/,/# <<< conda initialize <<</p')
+    local conda_text=$(sudo -u "$home" cat "/home/$home/.bashrc" | sed -n '/# >>> conda initialize >>>/,/# <<< conda initialize <<</p')
 
     if [[ -z "$conda_text" ]]; then
         echo "[WARN] Something is wrong with /home/$home/.bashrc file! Could not find conda initialization block."
@@ -466,8 +531,8 @@ update_bashrc() {
         exit 1
     fi
 
-    echo "[INFO] Appending conda initialization to /etc/bash.bashrc"
-    echo -e "\n\n# --- Added by SEISbio\n$conda_text" | sudo tee -a /etc/bash.bashrc > /dev/null
+    echo "[INFO] Appending conda initialization to $GLOBAL_BASHRC"
+    echo -e "\n\n# --- Added by SEISbio\n$conda_text" | sudo tee -a "$GLOBAL_BASHRC" > /dev/null
 }
 
 # Function to verify input files before starting installation
@@ -487,8 +552,8 @@ verify_input_files() {
         fi
     fi
     
-    # Verify BASE_PACKAGES_FILE if not skipping base packages
-    if [[ "$SKIP_BASE_PACKAGES" == "false" ]]; then
+    # Verify BASE_PACKAGES_FILE only if -b was specified
+    if [[ "$INSTALL_BASE_PACKAGES" == "true" ]]; then
         local base_pkg_path="$BASE_PACKAGES_FILE"
         # If relative path, prepend SCRIPT_DIR
         if [[ "$BASE_PACKAGES_FILE" != /* ]]; then
@@ -502,7 +567,7 @@ verify_input_files() {
             echo "[OK] Base packages file found: $base_pkg_path"
         fi
     else
-        echo "[INFO] Skipping base packages verification (--skip-base specified)"
+        echo "[INFO] Base packages installation skipped (use -b to enable)"
     fi
     
     # Verify YML_FILE if specified
@@ -544,7 +609,6 @@ verify_input_files() {
     # Verify Arch package files if --arch specified
     if [[ "$ARCH_INSTALL" == "true" ]]; then
         local arch_file="$SCRIPT_DIR/../arch/arch_pks.txt"
-        local aur_file="$SCRIPT_DIR/../arch/aur_pks.txt"
         
         if [[ ! -f "$arch_file" ]]; then
             echo "[ERROR] Arch packages file not found: $arch_file"
@@ -552,6 +616,11 @@ verify_input_files() {
         else
             echo "[OK] Arch packages file found: $arch_file"
         fi
+    fi
+    
+    # Verify AUR package files if --aur specified
+    if [[ "$AUR_INSTALL" == "true" ]]; then
+        local aur_file="$SCRIPT_DIR/../arch/aur_pks.txt"
         
         if [[ ! -f "$aur_file" ]]; then
             echo "[ERROR] AUR packages file not found: $aur_file"
@@ -594,6 +663,19 @@ main() {
         fi
         exit 0
     fi
+
+    # Check if ENV_FILE is specified and seisbio already exists -> only install envs
+    if [[ -n "$ENV_FILE" ]] && [[ -d "/home/$HOME_DIR" ]] && [[ -d "/home/$HOME_DIR/$DISTRIBUTION" ]]; then
+        echo "[INFO] Environment file specified and SEISbio installation detected."
+        echo "[INFO] Installing only virtual environments (no system recreation)."
+        echo "====================="
+
+        ENV_LIST=$(read_env_file "$ENV_FILE_PATH")
+        install_virtual_envs "$ENV_LIST" "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID"
+
+        echo "[END] Virtual environments installation completed."
+        exit 0
+    fi
     
     # If YAML specified but seisbio doesn't exist, warn and proceed with full installation
     if [[ -n "$YML_FILE" ]] && [[ ! -d "/home/$HOME_DIR/$DISTRIBUTION" ]]; then
@@ -628,11 +710,11 @@ main() {
             if [[ "$ANSWER_INSTALLED" == "y" ]]; then
                 echo "[INFO] Updating anaconda and installing basic packages."
                 update_distribution "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID"
-                if [[ "$SKIP_BASE_PACKAGES" == "false" ]]; then
-                    echo "[INFO] Installing scientific packages."
+                if [[ "$INSTALL_BASE_PACKAGES" == "true" ]]; then
+                    echo "[INFO] Installing base scientific packages."
                     install_distribution_base "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID" "$BASE_PACKAGES_FILE"
                 else
-                    echo "[INFO] Skipping base packages installation (--skip-base specified)."
+                    echo "[INFO] Skipping base packages installation (use -b to enable)."
                 fi
             elif [[ "$ANSWER_INSTALLED" == "n" ]]; then
                 echo "[INFO] Continue with envs installation!"
@@ -643,11 +725,11 @@ main() {
         else
             echo "[INFO] Updating anaconda and installing basic packages."
             update_distribution "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID"
-            if [[ "$SKIP_BASE_PACKAGES" == "false" ]]; then
+            if [[ "$INSTALL_BASE_PACKAGES" == "true" ]]; then
                 echo "[INFO] Installing base scientific packages."
                 install_distribution_base "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID" "$BASE_PACKAGES_FILE"
             else
-                echo "[INFO] Skipping base packages installation (--skip-base specified)."
+                echo "[INFO] Skipping base packages installation (use -b to enable)."
             fi
         fi
 
@@ -687,6 +769,11 @@ main() {
     if [[ "$ARCH_INSTALL" == "true" ]]; then
         echo "[START] Installing system packages for ArchLinux."
         arch_install_packages || { echo "[ERROR] Arch package installation failed."; exit 1; }
+    fi
+
+    if [[ "$AUR_INSTALL" == "true" ]]; then
+        echo "[START] Installing AUR packages for ArchLinux."
+        aur_install_packages || { echo "[ERROR] AUR package installation failed."; exit 1; }
     fi
 
     # Creating seisbio user
@@ -754,11 +841,11 @@ main() {
         if [[ "$ANSWER_INSTALLED" == "y" ]]; then
             echo "[INFO] Updating anaconda and installing basic packages."
             update_distribution "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID"
-            if [[ "$SKIP_BASE_PACKAGES" == "false" ]]; then
+            if [[ "$INSTALL_BASE_PACKAGES" == "true" ]]; then
                 echo "[INFO] Installing base scientific packages."
                 install_distribution_base "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID" "$BASE_PACKAGES_FILE"
             else
-                echo "[INFO] Skipping base packages installation (--skip-base specified)."
+                echo "[INFO] Skipping base packages installation (use -b to enable)."
             fi
         elif [[ "$ANSWER_INSTALLED" == "n" ]]; then
             echo "[INFO] Continue with envs installation!"
@@ -769,11 +856,11 @@ main() {
     else
         echo "[INFO] Updating anaconda and installing basic packages."
         update_distribution "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID"
-        if [[ "$SKIP_BASE_PACKAGES" == "false" ]]; then
+        if [[ "$INSTALL_BASE_PACKAGES" == "true" ]]; then
             echo "[INFO] Installing base scientific packages."
             install_distribution_base "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID" "$BASE_PACKAGES_FILE"
         else
-            echo "[INFO] Skipping base packages installation (--skip-base specified)."
+            echo "[INFO] Skipping base packages installation (use -b to enable)."
         fi
     fi
 

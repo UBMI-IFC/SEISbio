@@ -124,9 +124,9 @@ fi
 for ENV_NAME in $ENVS; do
 	echo "Loading environment: $ENV_NAME"
 	
-	# Export environment .yml to ymls folder
+	# Export environment .yml to ymls folder (no build strings, no absolute prefix)
 	echo "Exporting .yml to ymls/: "
-	"$CONDA" env export -n $ENV_NAME > ymls/${ENV_NAME}_environment.yml
+	"$CONDA" env export -n $ENV_NAME --no-builds | grep -v '^prefix:' > ymls/${ENV_NAME}_environment.yml
 
 	# Creating .def file
 	echo "=== Creating ==="

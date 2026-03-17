@@ -15,10 +15,10 @@ muscle
 phylip
 phyml
 # probcons
-raxml
+raxml-ng
 mrbayes
 seaview
 clustal-omega
-probalign
-proalign
+#probalign
+#proalign
 treeviewx

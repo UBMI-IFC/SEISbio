@@ -159,7 +159,7 @@ create_apptainer_container() {
     local yml_file="/home/$target_user/ymls/${env_name}_environment.yml"
     echo "[INFO] Exporting environment to: $yml_file"
     
-    if ! sudo -i -u "$target_user" bash -c "/home/$target_user/$distribution/bin/conda env export -n $env_name > /home/$target_user/ymls/${env_name}_environment.yml" 2>&1; then
+    if ! sudo -i -u "$target_user" bash -c "/home/$target_user/$distribution/bin/conda env export -n $env_name --no-builds | grep -v '^prefix:' > /home/$target_user/ymls/${env_name}_environment.yml" 2>&1; then
         echo "[ERROR] Failed to export environment $env_name"
         echo "[DEBUG] Tried to export from: /home/$target_user/$distribution/bin/conda"
         return 1
@@ -382,7 +382,7 @@ for ENV_NAME in $ENVS; do
     # Export environment to YAML
     YML_FILE="$TEMP_DIR/${ENV_NAME}_environment.yml"
     echo "[INFO] Exporting $ENV_NAME to YAML..."
-    if ! "$CONDA" env export -n "$ENV_NAME" > "$YML_FILE" 2>/dev/null; then
+    if ! "$CONDA" env export -n "$ENV_NAME" --no-builds | grep -v '^prefix:' > "$YML_FILE" 2>/dev/null; then
         echo "[ERROR] Failed to export $ENV_NAME"
         FAILED=$((FAILED + 1))
         continue
