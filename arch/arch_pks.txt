@@ -49,7 +49,7 @@ figlet
 cowsay
 lolcat
 dialog
-neofetch
+fastfetch
 
 # GUI - Programs for install graphic mode servers/workstations
 #

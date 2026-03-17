@@ -9,6 +9,53 @@ This project provides an automated system to install and manage bioinformatics s
 ### Transition: Environment Preparation (`seisbio.sh`)
 ### Phase 2: Apptainer Container Creation (`create_container.sh` and `build_container.sh`)
 
+## Dependencies
+
+SEISbio supports Debian/Ubuntu and Arch Linux based systems.
+
+### Required
+
+- `bash`, `sudo`, and standard GNU/Linux utilities
+- Conda distribution installed by the project (`Miniforge` or `Miniconda`)
+- `apptainer` (required to build and run `.sif` containers)
+
+### Debian/Ubuntu Package Dependencies
+
+Installed from the lists below (used by `install_seisbio.sh`):
+
+- `deb/basic_pkgs.txt` (system and utility tools):
+	`build-essential`, `cmake`, `aptitude`, `tree`, `bc`, `rsync`, `wget`, `curl`, `openssh-server`, `xrdp`, `fd-find`, `fzf`, `ripgrep`, `htop`, `neovim`, `emacs`, etc.
+- `deb/bioinfo_pkgs.txt` (bioinformatics tools):
+	`emboss`, `ncbi-blast+`, `hmmer`, `t-coffee`, `muscle`, `phylip`, `phyml`, `raxml`, `mrbayes`, `seaview`, `clustalo`, `treeview`, etc.
+
+### Arch Linux Package Dependencies
+
+Installed from the lists below:
+
+- `arch/arch_pks.txt` (official repositories):
+	`base-devel`, `cmake`, `tree`, `bc`, `rsync`, `wget`, `curl`, `openssh`, `fd`, `fzf`, `ripgrep`, `htop`, `btop`, `vim`, `emacs`, etc.
+- `arch/aur_pks.txt` (AUR):
+	`xrdp`, `toilet`, and bioinformatics packages such as `blast+-bin`, `hmmer`, `raxml-ng`, `mrbayes`, `clustal-omega`, etc.
+
+### Conda/Mamba Base Environment Dependencies
+
+Installed from `base/base_packages.txt`:
+
+- Scientific stack: `numpy`, `scipy`, `matplotlib`, `pandas`, `statsmodels`, `seaborn`
+- Bioinformatics: `biopython`
+- Workflow/network utilities: `networkx`
+- Jupyter stack: `jupyter`, `jupyterlab`, `jupyter-lsp`, `jupyterlab-lsp`, `jupyter-lsp-python`
+
+### Environment Package Lists
+
+Tool-specific conda environments are created from:
+
+- `envs/virtual_envs.txt` (full list)
+- `envs/small_virtual_envs.txt` (reduced list)
+- `envs/structural_biology.txt` (domain-specific list)
+
+Each line in these files is a package name (optionally version-pinned, e.g. `hicexplorer=3.2`).
+
 ## Phase 1: SEISbio System Installation
 
 ### Description
@@ -113,7 +160,7 @@ The generated containers preserve the original environment paths and are fully f
 **Run commands directly:**
 ```bash
 sudo -i -u seisbio
-./environments/test-env.sif python script.py
+./environments/test-env.sif 
 ./environments/test-env.sif bash -c 'conda list'
 ```
 
@@ -127,8 +174,8 @@ python --version
 
 **Check environment details:**
 ```bash
-./environments/test-env.sif bash -c 'which python'
-./environments/test-env.sif bash -c 'echo $CONDA_PREFIX'
+./environments/test-env.sif -c 'which python'
+./environments/test-env.sif -c 'echo $CONDA_PREFIX'
 ```
 
 **Note:** This is an alternative to creating environments from scratch with `install_seisbio.sh`. Use `cloner.sh` when you want to replicate your existing setup in the seisbio user and automatically generate portable containers in a single step.
@@ -268,5 +315,56 @@ environments/
 ├── star.sif
 └── ...
 ```
+## Uninstallation
 
+The `uninstall_seisbio.sh` script removes the SEISbio installation. It supports two modes: **system-wide** (requires root) and **local** (current user only).
+
+**What it does:**
+- Removes the conda/mamba distribution (Miniforge or Miniconda)
+- Removes Apptainer containers (`environments/`) and YAML files (`ymls/`)
+- Reverts conda initialization blocks added to the system or user bashrc
+- Optionally removes Debian/Ubuntu or Arch/AUR packages installed by SEISbio
+- Removes the `seisbio` user and their home directory 
+
+### Usage of uninstall_seisbio.sh
+
+**System-wide uninstall (requires root):**
+```bash
+sudo ./scripts/uninstall_seisbio.sh
+```
+
+### Uninstall Script Flags
+
+- `--local`: Uninstalls a local installation for the current user (no root required).
+- `-d, --distribution <name>`: Distribution folder name to remove. Default: `miniforge`.
+- `-h, --help`: Shows help and exits.
+
+### Uninstall Examples
+
+**1) Local uninstall for current user:**
+```bash
+./scripts/uninstall_seisbio.sh --local
+```
+
+**2) Local uninstall using Miniconda folder:**
+```bash
+./scripts/uninstall_seisbio.sh --local --distribution miniconda
+```
+
+**3) System-wide uninstall (default distribution: miniforge):**
+```bash
+sudo ./scripts/uninstall_seisbio.sh
+```
+
+**4) System-wide uninstall specifying distribution folder:**
+```bash
+sudo ./scripts/uninstall_seisbio.sh -d miniconda
+```
+
+**5) Show script help:**
+```bash
+./scripts/uninstall_seisbio.sh --help
+```
+
+**Note:** During system-wide uninstall, the script also prompts whether to remove Debian/Ubuntu and Arch/AUR packages listed in this repository.
 
