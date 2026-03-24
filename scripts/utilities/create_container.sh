@@ -75,7 +75,7 @@ if [[ "$CURRENT_DIR" != "$SEISBIO_HOME" ]]; then
     echo "[INFO] Copying necessary files to $SEISBIO_HOME..."
     # Get script directory to properly reference files
     SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-    sudo cp "$SCRIPT_DIR/../envs/virtual_envs.txt" "$SCRIPT_DIR/../envs/small_virtual_envs.txt" "$SCRIPT_DIR/build_container.sh" "$SCRIPT_DIR/create_container.sh" "$SEISBIO_HOME/" 2>/dev/null
+    sudo cp "$SCRIPT_DIR/../../envs/virtual_envs.txt" "$SCRIPT_DIR/../../envs/small_virtual_envs.txt" "$SCRIPT_DIR/build_container.sh" "$SCRIPT_DIR/create_container.sh" "$SEISBIO_HOME/" 2>/dev/null
     sudo chown seisbio:seisbio "$SEISBIO_HOME"/{virtual_envs.txt,small_virtual_envs.txt,build_container.sh,create_container.sh} 2>/dev/null
     
     echo "[INFO] Switching to $SEISBIO_HOME directory and seisbio user..."
