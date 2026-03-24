@@ -5,9 +5,10 @@ This project provides an automated system to install and manage bioinformatics s
 
 ## Complete Workflow
 
-### Phase 1: SEISbio System Installation (`install_seisbio.sh`)
-### Transition: Environment Preparation (`seisbio.sh`)
-### Phase 2: Apptainer Container Creation (`create_container.sh` and `build_container.sh`)
+### Phase 1: SEISbio System Installation (`scripts/install_seisbio.sh`)
+### Optional: Environment Backup (`scripts/env-backup.sh`)
+### Transition: Environment Preparation (`scripts/seisbio.sh`)
+### Phase 2: Apptainer Container Creation (`scripts/utilities/create_container.sh` and `scripts/utilities/build_container.sh`)
 
 ## Dependencies
 
@@ -79,7 +80,7 @@ Each line contains the name of a conda-forge or bioconda package. Version can be
 
 **Syntax:**
 ```bash
-sudo ./install_seisbio.sh [OPTIONS]
+sudo ./scripts/install_seisbio.sh [OPTIONS]
 ```
 
 ### Phase 1 Results
@@ -90,95 +91,68 @@ After running `install_seisbio.sh`:
 - Virtual environments created in `/home/seisbio/miniforge/envs/` (one per tool)
 - Conda initialized in `/etc/bash.bashrc` (accessible to all users)
 
-## Alternative: Cloning Existing Environments
+## Optional: Export Existing Environments
 
-### Description of `cloner.sh` script
+### Description of `env-backup.sh` script
 
-If you already have conda environments installed in your local user and want to clone them to the `seisbio` user instead of creating them from scratch, you can use the `cloner.sh` script. This script not only clones the environments but also automatically creates portable Apptainer containers.
+If you already have conda environments in your current user and want to reuse them in SEISbio, you can export them first with `scripts/env-backup.sh`.
 
 **What it does:**
-1. **Auto-detects**: Automatically detects your conda distribution (miniforge/miniconda) and package manager (mamba/conda)
-2. **Exports environments**: Exports your existing conda environments to YAML files
-3. **Clones to seisbio**: Recreates those environments in the `seisbio` user
-4. **Creates Apptainer containers**: Automatically generates `.def`, `.yml`, and `.sif` files for each environment
-5. **Preserves original paths**: Containers use the original environment paths for full compatibility
-6. **Handles duplicates**: Asks before overwriting existing environments
-7. **Provides statistics**: Shows summary of successful, failed, and skipped clones and containers
+1. **Auto-detects**: Detects conda distribution (miniforge/miniconda) and package manager (mamba/conda)
+2. **Exports environments**: Exports existing conda environments to YAML files
+3. **Writes to target user**: Saves YAML files into `/home/<target_user>/ymls`
+4. **Handles duplicates**: Asks before overwriting existing YAML files
+5. **Provides statistics**: Shows summary of successful, failed, and skipped exports
 
-### Usage of cloner.sh
+### Usage of env-backup.sh
 
-**Clone all your environments to seisbio:**
+**Export all environments to seisbio:**
 ```bash
-./cloner.sh
+./scripts/env-backup.sh
 ```
 
-**Clone a specific environment:**
+**Export a specific environment:**
 ```bash
-./cloner.sh -e test-env
+./scripts/env-backup.sh -e test-env
 ```
 
-**Clone to a different user:**
+**Export to a different user:**
 ```bash
-./cloner.sh -u myuser
+./scripts/env-backup.sh -u myuser
 ```
 
 **Force specific distribution and manager:**
 ```bash
-./cloner.sh -d miniconda -m conda
+./scripts/env-backup.sh -d miniconda -m conda
 ```
 
 **View help:**
 ```bash
-./cloner.sh -h
+./scripts/env-backup.sh -h
 ```
 
-### Cloner Options
+### env-backup Options
 
-- `-e, --env <name>`: Clone only the specified environment
-- `-u, --user <name>`: Target user to clone environments to [default: seisbio]
+- `-e, --env <name>`: Export only the specified environment
+- `-u, --user <name>`: Target user where `ymls/` will be created [default: seisbio]
 - `-d, --distribution <name>`: Distribution name (miniforge/miniconda) [default: auto-detected]
 - `-m, --manager <name>`: Package manager (mamba/conda) [default: auto-detected]
 - `-h, --help`: Display help message
 
-### Cloner Results
+### env-backup Results
 
-After running `cloner.sh`, the following files are created in `/home/seisbio/`:
+After running `scripts/env-backup.sh`, the following files are created in `/home/seisbio/`:
 
 ```
 ymls/
 ├── <env_name>_environment.yml     # Exported conda environment configuration
-
-environments/
-├── <env_name>.def                 # Apptainer definition file
-└── <env_name>.sif                 # Ready-to-use portable container
 ```
 
-### Using Cloned Containers
+These YAML files can be installed later with:
 
-The generated containers preserve the original environment paths and are fully functional:
-
-**Run commands directly:**
 ```bash
-sudo -i -u seisbio
-./environments/test-env.sif 
-./environments/test-env.sif bash -c 'conda list'
+sudo ./scripts/install_seisbio.sh --yml /home/seisbio/ymls
 ```
-
-**Interactive session:**
-```bash
-./environments/test-env.sif
-# Now inside the container
-conda list
-python --version
-```
-
-**Check environment details:**
-```bash
-./environments/test-env.sif -c 'which python'
-./environments/test-env.sif -c 'echo $CONDA_PREFIX'
-```
-
-**Note:** This is an alternative to creating environments from scratch with `install_seisbio.sh`. Use `cloner.sh` when you want to replicate your existing setup in the seisbio user and automatically generate portable containers in a single step.
 
 ## Transition: Environment Preparation
 
@@ -196,7 +170,7 @@ The `seisbio.sh` script is a helper that facilitates the transition between Phas
 Run this script after completing Phase 1 and before starting Phase 2:
 
 ```bash
-./seisbio.sh
+./scripts/seisbio.sh
 ```
 
 This command will:
@@ -235,10 +209,17 @@ Builds the Apptainer containers (`.sif` files) from the previously created `.def
 
 ## Usage
 
+Scripts location in repository:
+
+- `scripts/utilities/create_container.sh`
+- `scripts/utilities/build_container.sh`
+
+When running `scripts/seisbio.sh` or `scripts/utilities/create_container.sh` from outside `/home/seisbio/`, both scripts are copied automatically into `/home/seisbio/`.
+
 ### Step 1: Grant execution permissions
 
 ```bash
-chmod +x create_container.sh build_container.sh
+chmod +x scripts/utilities/create_container.sh scripts/utilities/build_container.sh
 ```
 
 ### Step 2: Create definition files
@@ -248,7 +229,7 @@ chmod +x create_container.sh build_container.sh
 **Option A: Process all environments**
 
 ```bash
-./create_container.sh
+./scripts/utilities/create_container.sh
 ```
 
 This will process all available conda environments (except `base`).
@@ -256,8 +237,8 @@ This will process all available conda environments (except `base`).
 **Option B: Process a specific environment**
 
 ```bash
-./create_container.sh -e samtools
-./create_container.sh --env fastqc
+./scripts/utilities/create_container.sh -e samtools
+./scripts/utilities/create_container.sh --env fastqc
 ```
 
 This will process only the specified environment.
@@ -265,7 +246,7 @@ This will process only the specified environment.
 **View help:**
 
 ```bash
-./create_container.sh -h
+./scripts/utilities/create_container.sh -h
 ```
 
 ### Step 3: Build the containers
@@ -273,7 +254,7 @@ This will process only the specified environment.
 **Requires root permissions (sudo)**
 
 ```bash
-sudo ./build_container.sh
+sudo ./scripts/utilities/build_container.sh
 ```
 
 This process may take quite some time, as it:
