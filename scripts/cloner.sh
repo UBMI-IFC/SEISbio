@@ -5,16 +5,15 @@ TARGET_UID=1015
 DISTRIBUTION="miniforge"
 MANAGER="mamba"
 SELECTED_ENV=""
-TEMP_DIR="/tmp/seisbio_clone_$$"
 
 # Function to display usage
 usage() {
     echo "Usage: $0 [OPTIONS]"
-    echo "Clone conda environments from current user to seisbio user and create Apptainer containers"
+    echo "Export conda environments from current user to YAML files in target user home"
     echo ""
     echo "Options:"
-    echo "  -e, --env <name>              Clone only the specified environment"
-    echo "  -u, --user <name>             Target user to clone environments to [default: seisbio]"
+    echo "  -e, --env <name>              Export only the specified environment"
+    echo "  -u, --user <name>             Target user where ymls/ will be created [default: seisbio]"
     echo "  -d, --distribution <name>     Distribution name (miniforge/miniconda) [default: auto-detect]"
     echo "  -m, --manager <name>          Package manager (mamba/conda) [default: auto-detect]"
     echo "  -h, --help                    Display this help message and exit"
@@ -118,130 +117,6 @@ detect_distribution_and_manager() {
     echo "${detected_dist:-miniforge} ${detected_mgr:-mamba}"
 }
 
-# Function to create Apptainer container from environment
-create_apptainer_container() {
-    local env_name="$1"
-    local target_user="$2"
-    local distribution="$3"
-    local original_env_path="$4"
-    
-    echo ""
-    echo "-----------------------------------"
-    echo "[CONTAINER] Creating Apptainer container for: $env_name"
-    echo "[INFO] Using original environment path: $original_env_path"
-    
-    # Check if Apptainer is installed
-    if ! command -v apptainer &>/dev/null; then
-        echo "[WARN] Apptainer not installed. Skipping container creation."
-        echo "[INFO] Install with: sudo apt install apptainer"
-        return 1
-    fi
-    
-    # Use original path if provided, otherwise get from cloned environment
-    local env_path="$original_env_path"
-    
-    if [[ -z "$env_path" ]]; then
-        env_path=$(sudo -i -u "$target_user" bash -c "/home/$target_user/$distribution/bin/conda env list" 2>/dev/null | grep "^${env_name} " | awk '{print $2}')
-        
-        if [[ -z "$env_path" ]]; then
-            echo "[ERROR] Could not determine path for environment $env_name"
-            echo "[DEBUG] Checking with: /home/$target_user/$distribution/bin/conda env list"
-            return 1
-        fi
-    fi
-    
-    echo "[INFO] Container will use path: $env_path"
-    
-    # Create directories in target user's home
-    sudo -u "$target_user" mkdir -p "/home/$target_user/environments" "/home/$target_user/ymls"
-    
-    # Export environment to YAML
-    local yml_file="/home/$target_user/ymls/${env_name}_environment.yml"
-    echo "[INFO] Exporting environment to: $yml_file"
-    
-    if ! sudo -i -u "$target_user" bash -c "/home/$target_user/$distribution/bin/conda env export -n $env_name --no-builds | grep -v '^prefix:' > /home/$target_user/ymls/${env_name}_environment.yml" 2>&1; then
-        echo "[ERROR] Failed to export environment $env_name"
-        echo "[DEBUG] Tried to export from: /home/$target_user/$distribution/bin/conda"
-        return 1
-    fi
-    
-    echo "[SUCCESS] Environment exported to: $yml_file"
-    
-    # Remove the prefix line from the YAML to avoid conflicts with -p flag
-    echo "[INFO] Removing prefix from YAML file..."
-    sudo sed -i '/^prefix:/d' "$yml_file"
-    
-    # Create .def file
-    local def_file="/home/$target_user/environments/${env_name}.def"
-    echo "[INFO] Creating definition file: $def_file"
-    
-    # Create .def file directly with variables
-    cat << DEFEOF | sudo tee "$def_file" > /dev/null
-Bootstrap: docker
-From: continuumio/miniconda3
-
-%help
-    Apptainer container with conda environment "${env_name}"
-    Original environment path: ${env_path}
-
-%files
-    /home/$target_user/ymls/${env_name}_environment.yml /opt/environment.yml
-
-%post
-    echo "Creating conda environment at original path: ${env_path}"
-    
-    # Create parent directory structure (but not the env directory itself)
-    mkdir -p "\$(dirname ${env_path})"
-    
-    # Remove the environment directory if it exists (to ensure clean creation)
-    rm -rf ${env_path}
-    
-    # Create environment at the original path
-    /opt/conda/bin/conda env create -f /opt/environment.yml -p ${env_path}
-    
-    echo "Cleaning cache"
-    /opt/conda/bin/conda clean -afy
-
-%environment
-    export PATH=${env_path}/bin:/opt/conda/bin:\$PATH
-    export CONDA_DEFAULT_ENV=${env_name}
-    export CONDA_PREFIX=${env_path}
-
-%runscript
-    #!/bin/bash
-    source /opt/conda/etc/profile.d/conda.sh
-    conda activate ${env_path}
-    
-    if [ \$# -eq 0 ]; then
-        exec /bin/bash
-    else
-        exec "\$@"
-    fi
-DEFEOF
-    
-    # Set ownership
-    sudo chown "$target_user:$target_user" "$def_file"
-    
-    # Build container
-    local sif_file="/home/$target_user/environments/${env_name}.sif"
-    echo "[INFO] Building container: $sif_file"
-    echo "[INFO] This may take several minutes..."
-    echo "[INFO] Building with absolute paths"
-    
-    # Build with absolute paths
-    if sudo apptainer build "$sif_file" "$def_file" 2>&1 | tee "/tmp/apptainer_build_${env_name}.log"; then
-        echo "[SUCCESS] Container created: $sif_file"
-        sudo chown "$target_user:$target_user" "$sif_file"
-        return 0
-    else
-        echo "[ERROR] Failed to build container for $env_name"
-        echo "[INFO] Check log: /tmp/apptainer_build_${env_name}.log"
-        echo "[DEBUG] .def file: $def_file"
-        echo "[DEBUG] .yml file: $yml_file"
-        return 1
-    fi
-}
-
 # Get current user info
 CURRENT_USER=$(whoami)
 CURRENT_UID=$(id -u)
@@ -267,7 +142,7 @@ if [[ "$MANAGER" == "mamba" ]] && [[ -n "$DETECTED_MGR" ]]; then
 fi
 
 echo "====================================="
-echo "  SEISbio Environment Cloner"
+echo "  SEISbio Environment Exporter"
 echo "====================================="
 echo ""
 echo "[INFO] Source user: $CURRENT_USER (UID: $CURRENT_UID)"
@@ -288,41 +163,34 @@ fi
 # Get target user UID
 TARGET_UID=$(id -u "$TARGET_USER")
 
-# Check if target distribution is installed
-if [[ ! -d "/home/$TARGET_USER/$DISTRIBUTION" ]]; then
-    echo "[ERROR] $DISTRIBUTION not installed for user $TARGET_USER"
-    echo "[INFO] Expected path: /home/$TARGET_USER/$DISTRIBUTION"
-    echo "[INFO] Run install_seisbio.sh first to install $DISTRIBUTION"
-    exit 1
-fi
-
 echo "[INFO] Using conda: $($CONDA --version)"
 echo ""
 
-# Create temporary directory
-mkdir -p "$TEMP_DIR"
-echo "[INFO] Using temporary directory: $TEMP_DIR"
-echo ""
+# Ensure target YAML directory exists
+TARGET_YMLS_DIR="/home/$TARGET_USER/ymls"
+echo "[INFO] Ensuring target YAML directory exists: $TARGET_YMLS_DIR"
+sudo -u "$TARGET_USER" mkdir -p "$TARGET_YMLS_DIR" || {
+    echo "[ERROR] Failed to create target directory: $TARGET_YMLS_DIR"
+    exit 1
+}
 
 # Get list of environments (exclude base)
 if [[ -n "$SELECTED_ENV" ]]; then
     # Verify environment exists
     if "$CONDA" env list | grep -q "^${SELECTED_ENV} "; then
         ENVS="$SELECTED_ENV"
-        echo "[INFO] Cloning environment: $SELECTED_ENV"
+        echo "[INFO] Exporting environment: $SELECTED_ENV"
     else
         echo "[ERROR] Environment '$SELECTED_ENV' does not exist"
         echo "[INFO] Available environments:"
         "$CONDA" env list | grep -v '^#' | awk '{print "  - " $1}' | grep -v '^base$'
-        rm -rf "$TEMP_DIR"
         exit 1
     fi
 else
     ENVS=$("$CONDA" env list | grep -v '^#' | awk '{print $1}' | grep -v '^base$')
     
     if [[ -z "$ENVS" ]]; then
-        echo "[INFO] No conda environments found to clone"
-        rm -rf "$TEMP_DIR"
+        echo "[INFO] No conda environments found to export"
         exit 0
     fi
     
@@ -334,7 +202,7 @@ fi
 
 echo ""
 echo "====================================="
-echo "  Starting cloning process"
+echo "  Starting export process"
 echo "====================================="
 echo ""
 
@@ -343,128 +211,55 @@ TOTAL=0
 SUCCESS=0
 FAILED=0
 SKIPPED=0
-CONTAINERS_CREATED=0
-CONTAINERS_FAILED=0
 
-# Get existing environments in target user
-echo "[INFO] Checking existing environments in $TARGET_USER..."
-TARGET_ENVS=$(sudo -i -u "$TARGET_USER" bash -c "conda env list" 2>/dev/null | grep -v '^#' | awk '{print $1}')
-
-# Clone each environment
+# Export each environment to YAML in target user home
 for ENV_NAME in $ENVS; do
     TOTAL=$((TOTAL + 1))
     echo "-----------------------------------"
     echo "[${TOTAL}] Processing: $ENV_NAME"
     
-    # Check if environment already exists in target
-    if echo "$TARGET_ENVS" | grep -q "^${ENV_NAME}$"; then
-        echo "[WARN] Environment '$ENV_NAME' already exists in $TARGET_USER"
-        read -p "Do you want to recreate it? y/[n]: " ANSWER
+    TARGET_YML="$TARGET_YMLS_DIR/${ENV_NAME}_environment.yml"
+
+    # Check if YAML already exists in target
+    if [[ -f "$TARGET_YML" ]]; then
+        echo "[WARN] YAML file already exists: $TARGET_YML"
+        read -p "Do you want to overwrite it? y/[n]: " ANSWER
         if [[ "$ANSWER" != "y" && "$ANSWER" != "Y" ]]; then
             echo "[SKIP] Skipping $ENV_NAME"
             SKIPPED=$((SKIPPED + 1))
             continue
         fi
-        
-        # Remove existing environment
-        echo "[INFO] Removing existing environment..."
-        if ! sudo -i -u "$TARGET_USER" bash -c "~/$DISTRIBUTION/bin/conda env remove -n $ENV_NAME -y" 2>/dev/null; then
-            echo "[ERROR] Failed to remove existing environment $ENV_NAME"
-            FAILED=$((FAILED + 1))
-            continue
-        fi
     fi
-    
-    # Get original environment path before cloning
-    ORIGINAL_ENV_PATH=$("$CONDA" env list | grep "^${ENV_NAME} " | awk '{print $2}')
-    echo "[INFO] Original environment path: $ORIGINAL_ENV_PATH"
-    
-    # Export environment to YAML
-    YML_FILE="$TEMP_DIR/${ENV_NAME}_environment.yml"
-    echo "[INFO] Exporting $ENV_NAME to YAML..."
-    if ! "$CONDA" env export -n "$ENV_NAME" --no-builds | grep -v '^prefix:' > "$YML_FILE" 2>/dev/null; then
+
+    echo "[INFO] Exporting $ENV_NAME to: $TARGET_YML"
+    if ! "$CONDA" env export -n "$ENV_NAME" --no-builds | grep -v '^prefix:' | sudo tee "$TARGET_YML" > /dev/null; then
         echo "[ERROR] Failed to export $ENV_NAME"
         FAILED=$((FAILED + 1))
         continue
     fi
-    
-    # Copy YAML to target user's home
-    TARGET_YML="/home/$TARGET_USER/${ENV_NAME}_temp.yml"
-    echo "[INFO] Copying YAML to $TARGET_USER home..."
-    if ! sudo cp "$YML_FILE" "$TARGET_YML"; then
-        echo "[ERROR] Failed to copy YAML file"
-        FAILED=$((FAILED + 1))
-        continue
-    fi
-    
-    # Set ownership
+
     sudo chown "$TARGET_UID:$TARGET_UID" "$TARGET_YML"
-    
-    # Create environment in target user
-    echo "[INFO] Creating environment in $TARGET_USER..."
-    if sudo -i -u "$TARGET_USER" bash -c "~/$DISTRIBUTION/bin/$MANAGER env create -f ~/${ENV_NAME}_temp.yml" 2>&1 | tee /tmp/clone_output_$$.log; then
-        echo "[SUCCESS] Environment '$ENV_NAME' cloned successfully!"
-        SUCCESS=$((SUCCESS + 1))
-        
-        # Always create Apptainer container with original path
-        echo "[INFO] Creating Apptainer container for $ENV_NAME..."
-        if create_apptainer_container "$ENV_NAME" "$TARGET_USER" "$DISTRIBUTION" "$ORIGINAL_ENV_PATH"; then
-            CONTAINERS_CREATED=$((CONTAINERS_CREATED + 1))
-        else
-            CONTAINERS_FAILED=$((CONTAINERS_FAILED + 1))
-        fi
-    else
-        echo "[ERROR] Failed to create environment $ENV_NAME in $TARGET_USER"
-        FAILED=$((FAILED + 1))
-    fi
-    
-    # Clean up temporary YAML in target user's home
-    sudo rm -f "$TARGET_YML"
+    echo "[SUCCESS] YAML created: $TARGET_YML"
+    SUCCESS=$((SUCCESS + 1))
     
     echo ""
 done
 
-# Clean up temporary directory
-echo "[INFO] Cleaning up temporary files..."
-rm -rf "$TEMP_DIR"
-rm -f /tmp/clone_output_$$.log
-
 # Summary
 echo ""
 echo "====================================="
-echo "  Cloning Summary"
+echo "  Export Summary"
 echo "====================================="
 echo "Total environments processed: $TOTAL"
-echo "Successfully cloned: $SUCCESS"
+echo "Successfully exported: $SUCCESS"
 echo "Failed: $FAILED"
 echo "Skipped: $SKIPPED"
-echo "-----------------------------------"
-echo "Containers created: $CONTAINERS_CREATED"
-echo "Containers failed: $CONTAINERS_FAILED"
 echo "====================================="
 echo ""
 
 if [[ $SUCCESS -gt 0 ]]; then
-    echo "[INFO] Cloned environments are now available in $TARGET_USER"
-    echo "[INFO] To verify, run:"
-    echo "       sudo -i -u $TARGET_USER"
-    echo "       conda env list"
-    
-    if [[ $CONTAINERS_CREATED -gt 0 ]]; then
-        echo ""
-        echo "[INFO] Apptainer containers available in:"
-        echo "       /home/$TARGET_USER/environments/"
-        echo ""
-        echo "[INFO] Container files created:"
-        echo "       - /home/$TARGET_USER/ymls/<env>_environment.yml"
-        echo "       - /home/$TARGET_USER/environments/<env>.def"
-        echo "       - /home/$TARGET_USER/environments/<env>.sif"
-        echo ""
-        echo "[INFO] To test a container, run:"
-        echo "       sudo -i -u $TARGET_USER"
-        echo "       ./environments/<env_name>.sif <command>"
-        echo ""
-    fi
+    echo "[INFO] Exported YAML files are available in:"
+    echo "       $TARGET_YMLS_DIR"
 fi
 
 exit 0

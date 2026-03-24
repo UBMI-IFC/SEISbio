@@ -22,7 +22,9 @@ DEB_UPGRADE=false
 ARCH_INSTALL=false
 AUR_INSTALL=false
 ENV_FILE=""
-YML_FILE=""
+YML_DIR="../ymls"
+YML_DIR_PATH=""
+INSTALL_YML_ENVS=false
 BASE_PACKAGES_FILE="../base/base_packages.txt"
 INSTALL_BASE_PACKAGES=false
 LOCAL_INSTALL=false
@@ -47,7 +49,9 @@ usage() {
     echo "                                            WARNING: AUR packages require yay to be installed."
     echo "  -f, --envfile <file>                      File that specifies the virtual environments to create in SEISbio installation."
     echo "                                            [default: ./envs/virtual_envs.txt]. You can read the file specification in ./envs/virtual_envs.txt"
-    echo " -y, --yml, --yaml <file>    	      YAML file (environment.yml format) that specifies a conda environment to install."
+    echo "  -y, --yml, --yaml [dir]                    Install all conda environments from YAML files in a directory."
+    echo "                                            Optional [dir]: folder containing .yml/.yaml files."
+    echo "                                            Without [dir], uses default: ./ymls"
     echo "  -b, --base-packages [file]                Install base scientific packages. Optional: specify a custom file."
     echo "                                            Without [file], uses the default: ./base/base_packages.txt"
     echo "                                            Base packages are NOT installed unless this flag is used."
@@ -88,9 +92,13 @@ while [[ "$#" -gt 0 ]]; do
             shift
             ;;
         -y|--yml|--yaml)
-            YML_FILE="$2"
-	    shift
-	    ;;
+            INSTALL_YML_ENVS=true
+            # Directory argument is optional: only consume next arg if it doesn't start with -
+            if [[ -n "${2:-}" && "${2:-}" != -* ]]; then
+                YML_DIR="$2"
+                shift
+            fi
+            ;;
         -b|--base-packages)
             INSTALL_BASE_PACKAGES=true
             # File argument is optional: only consume next arg if it doesn't start with -
@@ -165,6 +173,26 @@ if [[ -n "$ENV_FILE" ]]; then
     fi
 else
     ENV_FILE_PATH=""
+fi
+
+# Resolve YML_DIR_PATH intelligently (only when YAML installation is requested)
+if [[ "$INSTALL_YML_ENVS" == "true" ]]; then
+    if [[ "$YML_DIR" == /* ]]; then
+        # Absolute path - use as is
+        YML_DIR_PATH="$YML_DIR"
+        echo "     ... YAML dir from absolute path:"
+        echo "     ... $YML_DIR_PATH"
+    elif [[ "$YML_DIR" == ../* ]]; then
+        # Relative to script directory
+        YML_DIR_PATH="$SCRIPT_DIR/$YML_DIR"
+        echo "     ... YAML dir from path relative to script:"
+        echo "     ... $YML_DIR_PATH"
+    else
+        # Relative to current working directory
+        YML_DIR_PATH="$(pwd)/$YML_DIR"
+        echo "     ... YAML dir from current directory:"
+        echo "     ... $YML_DIR_PATH"
+    fi
 fi
 
 # Function to read package lists from file
@@ -464,6 +492,57 @@ install_env_from_yml() {
     return 0
 }
 
+# Function to install environments from all YAML files in a directory
+install_envs_from_yml_dir() {
+    local yml_dir="$1"
+    local manager="$2"
+    local distribution="$3"
+    local home="$4"
+    local uid="$5"
+
+    if [[ ! -d "$yml_dir" ]]; then
+        echo "[ERROR] YAML directory not found: $yml_dir"
+        return 1
+    fi
+
+    local failed=0
+    local found=0
+
+    shopt -s nullglob
+    local yml_files=("$yml_dir"/*.yml "$yml_dir"/*.yaml)
+    shopt -u nullglob
+
+    if [[ ${#yml_files[@]} -eq 0 ]]; then
+        echo "[ERROR] No .yml or .yaml files found in: $yml_dir"
+        return 1
+    fi
+
+    echo "[INFO] Found ${#yml_files[@]} YAML file(s) in $yml_dir"
+
+    for yml_file in "${yml_files[@]}"; do
+        found=1
+        echo "====================="
+        echo "[INFO] Processing YAML file: $yml_file"
+        if ! install_env_from_yml "$yml_file" "$manager" "$distribution" "$home" "$uid"; then
+            echo "[ERROR] Failed installing environment from: $yml_file"
+            failed=1
+        fi
+    done
+
+    if [[ "$found" -eq 0 ]]; then
+        echo "[ERROR] No YAML files were processed."
+        return 1
+    fi
+
+    if [[ "$failed" -ne 0 ]]; then
+        echo "[ERROR] One or more YAML environments failed to install."
+        return 1
+    fi
+
+    echo "[SUCCESS] All YAML environments installed successfully."
+    return 0
+}
+
 # Function to install virtual environments
 install_virtual_envs() {
     local pkg_list_str="$1"
@@ -570,19 +649,22 @@ verify_input_files() {
         echo "[INFO] Base packages installation skipped (use -b to enable)"
     fi
     
-    # Verify YML_FILE if specified
-    if [[ -n "$YML_FILE" ]]; then
-        local yml_path="$YML_FILE"
-        # If relative path, use current directory
-        if [[ "$YML_FILE" != /* ]]; then
-            yml_path="$(pwd)/$YML_FILE"
-        fi
-        
-        if [[ ! -f "$yml_path" ]]; then
-            echo "[ERROR] YAML file not found: $yml_path"
+    # Verify YAML directory and its files if --yml/--yaml was specified
+    if [[ "$INSTALL_YML_ENVS" == "true" ]]; then
+        if [[ ! -d "$YML_DIR_PATH" ]]; then
+            echo "[ERROR] YAML directory not found: $YML_DIR_PATH"
             errors=$((errors + 1))
         else
-            echo "[OK] YAML file found: $yml_path"
+            echo "[OK] YAML directory found: $YML_DIR_PATH"
+            shopt -s nullglob
+            local yml_files=("$YML_DIR_PATH"/*.yml "$YML_DIR_PATH"/*.yaml)
+            shopt -u nullglob
+            if [[ ${#yml_files[@]} -eq 0 ]]; then
+                echo "[ERROR] No .yml or .yaml files found in: $YML_DIR_PATH"
+                errors=$((errors + 1))
+            else
+                echo "[OK] Found ${#yml_files[@]} YAML file(s) in: $YML_DIR_PATH"
+            fi
         fi
     fi
     
@@ -647,18 +729,18 @@ main() {
     # Verify all input files before starting
     verify_input_files
     
-    # Check if YAML file is specified and seisbio already exists
-    if [[ -n "$YML_FILE" ]] && [[ -d "/home/$HOME_DIR" ]] && [[ -d "/home/$HOME_DIR/$DISTRIBUTION" ]]; then
-        echo "[INFO] YAML file specified and SEISbio installation detected."
-        echo "[INFO] Installing only the environment from YAML file (no system recreation)."
+    # Check if YAML directory is specified and seisbio already exists
+    if [[ "$INSTALL_YML_ENVS" == "true" ]] && [[ -d "/home/$HOME_DIR" ]] && [[ -d "/home/$HOME_DIR/$DISTRIBUTION" ]]; then
+        echo "[INFO] YAML directory specified and SEISbio installation detected."
+        echo "[INFO] Installing all environments from YAML directory (no system recreation)."
         echo "====================="
         
-        install_env_from_yml "$YML_FILE" "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID"
+        install_envs_from_yml_dir "$YML_DIR_PATH" "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID"
         
         if [[ $? -eq 0 ]]; then
-            echo "[END] YAML environment installation completed."
+            echo "[END] YAML environments installation completed."
         else
-            echo "[ERROR] Failed to install environment from YAML."
+            echo "[ERROR] Failed to install environments from YAML directory."
             exit 1
         fi
         exit 0
@@ -677,10 +759,10 @@ main() {
         exit 0
     fi
     
-    # If YAML specified but seisbio doesn't exist, warn and proceed with full installation
-    if [[ -n "$YML_FILE" ]] && [[ ! -d "/home/$HOME_DIR/$DISTRIBUTION" ]]; then
-        echo "[INFO] YAML file specified but SEISbio not installed yet."
-        echo "[INFO] Will perform full SEISbio installation first, then install YAML environment."
+    # If YAML directory specified but seisbio doesn't exist, warn and proceed with full installation
+    if [[ "$INSTALL_YML_ENVS" == "true" ]] && [[ ! -d "/home/$HOME_DIR/$DISTRIBUTION" ]]; then
+        echo "[INFO] YAML directory specified but SEISbio not installed yet."
+        echo "[INFO] Will perform full SEISbio installation first, then install all YAML environments."
         echo "====================="
     fi
     
@@ -741,11 +823,11 @@ main() {
             echo "[INFO] No virtual environments file specified, skipping."
         fi
         
-        # Install YAML environment if specified
-        if [[ -n "$YML_FILE" ]]; then
+        # Install YAML environments if specified
+        if [[ "$INSTALL_YML_ENVS" == "true" ]]; then
             echo "====================="
-            echo "[INFO] Installing additional environment from YAML file."
-            install_env_from_yml "$YML_FILE" "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID"
+            echo "[INFO] Installing additional environments from YAML directory."
+            install_envs_from_yml_dir "$YML_DIR_PATH" "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID"
         fi
         
         echo "[END] All packages installed"
@@ -872,11 +954,11 @@ main() {
         echo "[INFO] No virtual environments file specified, skipping."
     fi
     
-    # Install YAML environment if specified
-    if [[ -n "$YML_FILE" ]]; then
+    # Install YAML environments if specified
+    if [[ "$INSTALL_YML_ENVS" == "true" ]]; then
         echo "====================="
-        echo "[INFO] Installing additional environment from YAML file."
-        install_env_from_yml "$YML_FILE" "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID"
+        echo "[INFO] Installing additional environments from YAML directory."
+        install_envs_from_yml_dir "$YML_DIR_PATH" "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID"
     fi
     
     echo "[END] All packages installed"
