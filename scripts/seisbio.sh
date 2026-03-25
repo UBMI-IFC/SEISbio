@@ -6,7 +6,7 @@ if [[ "$(pwd)" != "$SEISBIO_HOME" ]]; then
     echo "[INFO] Copiando archivos..."
     # Get script directory to properly reference files
     SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-    sudo cp "$SCRIPT_DIR/../envs/virtual_envs.txt" "$SCRIPT_DIR/../envs/small_virtual_envs.txt" "$SCRIPT_DIR/utilities/build_container.sh" "$SCRIPT_DIR/utilities/create_container.sh" "$SCRIPT_DIR/install_seisbio.sh" "$SEISBIO_HOME/"
+    sudo cp "$SCRIPT_DIR/../envs/virtual_envs.txt" "$SCRIPT_DIR/../envs/small_virtual_envs.txt" "$SCRIPT_DIR/utilities/build_container.sh" "$SCRIPT_DIR/utilities/create_container.sh" "$SCRIPT_DIR/utilities/run_container_pipeline.sh" "$SCRIPT_DIR/install_seisbio.sh" "$SEISBIO_HOME/"
 
     echo "[INFO] Abriendo sesión como seisbio..."
     exec sudo -i -u seisbio
