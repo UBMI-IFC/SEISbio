@@ -4,7 +4,6 @@
 set -o pipefail
 
 TARGET_USER="seisbio"
-TARGET_UID=1015
 DISTRIBUTION="miniforge"
 MANAGER="mamba"
 SELECTED_ENV=""
@@ -34,7 +33,12 @@ usage() {
     echo "  -m, --manager <name>          Package manager (mamba/conda) [default: auto-detect]"
     echo "  -h, --help                    Display this help message and exit"
     echo ""
-       exit 1
+    exit 1
+}
+
+print_permission_hint() {
+    echo "[INFO] This script runs without sudo by design."
+    echo "[INFO] Use a shared group + directory permissions so current user can write to target ymls/."
 }
 
 # Parse arguments
@@ -176,19 +180,25 @@ if ! id "$TARGET_USER" &>/dev/null; then
     exit 1
 fi
 
-# Get target user UID
-TARGET_UID=$(id -u "$TARGET_USER")
-
 echo "[INFO] Using conda: $($CONDA --version)"
 echo ""
 
 # Ensure target YAML directory exists
 TARGET_YMLS_DIR="/home/$TARGET_USER/ymls"
 echo "[INFO] Ensuring target YAML directory exists: $TARGET_YMLS_DIR"
-sudo -u "$TARGET_USER" mkdir -p "$TARGET_YMLS_DIR" || {
-    echo "[ERROR] Failed to create target directory: $TARGET_YMLS_DIR"
-    exit 1
-}
+if [[ -d "$TARGET_YMLS_DIR" ]]; then
+    if [[ ! -w "$TARGET_YMLS_DIR" ]]; then
+        echo "[ERROR] No write permission on existing directory: $TARGET_YMLS_DIR"
+        print_permission_hint
+        exit 1
+    fi
+else
+    if ! mkdir -p "$TARGET_YMLS_DIR" 2>/dev/null; then
+        echo "[ERROR] Failed to create target directory: $TARGET_YMLS_DIR"
+        print_permission_hint
+        exit 1
+    fi
+fi
 
 # Get list of environments (exclude base)
 if [[ -n "$SELECTED_ENV" ]]; then
@@ -248,13 +258,12 @@ for ENV_NAME in $ENVS; do
     fi
 
     echo "[INFO] Exporting $ENV_NAME to: $TARGET_YML"
-    if ! "$CONDA" env export -n "$ENV_NAME" --no-builds | grep -v '^prefix:' | sudo tee "$TARGET_YML" > /dev/null; then
+    if ! "$CONDA" env export -n "$ENV_NAME" --no-builds | grep -v '^prefix:' > "$TARGET_YML"; then
         echo "[ERROR] Failed to export $ENV_NAME"
         FAILED=$((FAILED + 1))
         continue
     fi
 
-    sudo chown "$TARGET_UID:$TARGET_UID" "$TARGET_YML"
     echo "[SUCCESS] YAML created: $TARGET_YML"
     SUCCESS=$((SUCCESS + 1))
     

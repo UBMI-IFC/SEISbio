@@ -28,6 +28,7 @@ INSTALL_YML_ENVS=false
 BASE_PACKAGES_FILE="../base/base_packages.txt"
 INSTALL_BASE_PACKAGES=false
 LOCAL_INSTALL=false
+SHARED_EXPORT_GROUP="seisbio-share"
 
 # Function to display usage
 usage() {
@@ -209,6 +210,70 @@ read_env_file() {
         pkg_list+=("$line")
     done < "$fname"
     echo "${pkg_list[@]}"
+}
+
+# Configure shared group permissions so env-backup.sh can write without sudo.
+configure_env_backup_permissions() {
+    local home_user="$1"
+    local yml_dir="/home/$home_user/ymls"
+    local export_group="$SHARED_EXPORT_GROUP"
+    local exporter_user=""
+
+    if [[ -n "$SUDO_USER" && "$SUDO_USER" != "root" ]]; then
+        exporter_user="$SUDO_USER"
+    elif [[ "$CURRENT_USER" != "root" ]]; then
+        exporter_user="$CURRENT_USER"
+    fi
+
+    echo "[INFO] Configuring shared permissions for env-backup exports"
+
+    if ! getent group "$export_group" >/dev/null; then
+        sudo groupadd "$export_group" || {
+            echo "[ERROR] Failed to create shared group: $export_group"
+            return 1
+        }
+    fi
+
+    sudo usermod -aG "$export_group" "$home_user" || {
+        echo "[ERROR] Failed to add '$home_user' to group '$export_group'"
+        return 1
+    }
+
+    if [[ -n "$exporter_user" ]] && id "$exporter_user" &>/dev/null; then
+        sudo usermod -aG "$export_group" "$exporter_user" || {
+            echo "[ERROR] Failed to add '$exporter_user' to group '$export_group'"
+            return 1
+        }
+    fi
+
+    sudo mkdir -p "$yml_dir" || {
+        echo "[ERROR] Failed to create directory: $yml_dir"
+        return 1
+    }
+
+    sudo chown "$home_user:$export_group" "$yml_dir" || {
+        echo "[ERROR] Failed to set ownership for: $yml_dir"
+        return 1
+    }
+
+    # setgid on directory keeps group ownership for new exported files
+    sudo chmod 2775 "$yml_dir" || {
+        echo "[ERROR] Failed to set permissions for: $yml_dir"
+        return 1
+    }
+
+    sudo find "$yml_dir" -type d -exec chmod g+s {} + 2>/dev/null || true
+    sudo chmod -R g+rwX "$yml_dir" || {
+        echo "[ERROR] Failed to apply group rw permissions in: $yml_dir"
+        return 1
+    }
+
+    echo "[INFO] Shared export directory configured: $yml_dir"
+    echo "[INFO] Shared group: $export_group"
+    if [[ -n "$exporter_user" ]]; then
+        echo "[INFO] Export user added to shared group: $exporter_user"
+        echo "[INFO] Re-login may be required for new group membership to apply."
+    fi
 }
 
 # Function to install Debian/Ubuntu bioinfo packages
@@ -898,6 +963,11 @@ main() {
             exit 1
         fi
     fi
+
+    configure_env_backup_permissions "$HOME_DIR" || {
+        echo "[ERROR] Could not configure shared permissions for env-backup.sh"
+        exit 1
+    }
 
     echo "[INFO] Moving to $HOME_DIR home"
     # No need to chdir in bash for subsequent commands if we use absolute paths or sudo -u
