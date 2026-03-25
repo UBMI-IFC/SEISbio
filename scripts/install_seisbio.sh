@@ -276,6 +276,23 @@ configure_env_backup_permissions() {
     fi
 }
 
+refresh_group_membership_session() {
+    local login_user="$1"
+
+    if [[ -z "$login_user" || "$login_user" == "root" ]]; then
+        return
+    fi
+
+    # Only refresh automatically in interactive terminals.
+    if [[ -t 0 && -t 1 ]]; then
+        echo "[INFO] Refreshing login session for '$login_user' to apply new group membership..."
+        echo "[INFO] If this is not desired, set SEISBIO_SKIP_SESSION_REFRESH=1 before running install."
+        if [[ "${SEISBIO_SKIP_SESSION_REFRESH:-0}" != "1" ]]; then
+            exec su -l "$login_user"
+        fi
+    fi
+}
+
 # Function to install Debian/Ubuntu bioinfo packages
 debian_install_bioinfo() {
     local upgrade="$1"
@@ -1032,6 +1049,8 @@ main() {
     fi
     
     echo "[END] All packages installed"
+
+    refresh_group_membership_session "$SUDO_USER"
 }
 
 # Call main function
