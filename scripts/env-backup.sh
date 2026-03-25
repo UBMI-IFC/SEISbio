@@ -1,10 +1,26 @@
 #!/bin/bash
 
+# Make pipelines fail if any command in the pipeline fails/interrupted
+set -o pipefail
+
 TARGET_USER="seisbio"
 TARGET_UID=1015
 DISTRIBUTION="miniforge"
 MANAGER="mamba"
 SELECTED_ENV=""
+
+# Handle interruptions (Ctrl+C / Ctrl+Z / kill)
+handle_interrupt() {
+    local sig="$1"
+    echo ""
+    echo "[WARN] Interrupted by signal: $sig"
+    echo "[INFO] Stopping export process..."
+    exit 130
+}
+
+trap 'handle_interrupt INT' INT
+trap 'handle_interrupt TERM' TERM
+trap 'handle_interrupt TSTP' TSTP
 
 # Function to display usage
 usage() {
