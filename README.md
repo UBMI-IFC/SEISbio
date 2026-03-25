@@ -8,7 +8,7 @@ This project provides an automated system to install and manage bioinformatics s
 ### Phase 1: SEISbio System Installation (`scripts/install_seisbio.sh`)
 ### Optional: Environment Backup (`scripts/env-backup.sh`)
 ### Transition: Environment Preparation (`scripts/seisbio.sh`)
-### Phase 2: Apptainer Container Creation (`scripts/utilities/create_container.sh` and `scripts/utilities/build_container.sh`)
+### Phase 2: Apptainer Container Creation (`scripts/utilities/run_container_pipeline.sh`)
 
 ## Dependencies
 
@@ -161,7 +161,7 @@ sudo ./scripts/install_seisbio.sh --yml /home/seisbio/ymls
 The `seisbio.sh` script is a helper that facilitates the transition between Phase 1 (installation) and Phase 2 (container creation). Its purpose is to prepare the `seisbio` user's environment with the necessary files.
 
 **What it does:**
-1. **Copies necessary files**: Transfers `virtual_envs.txt`, `small_virtual_envs.txt`, `build_container.sh`, `create_container.sh`, and `install_seisbio.sh` to the `/home/seisbio/` directory
+1. **Copies necessary files**: Transfers `virtual_envs.txt`, `small_virtual_envs.txt`, Phase 2 utility scripts, and `install_seisbio.sh` to the `/home/seisbio/` directory
 2. **Verifies Apptainer installation**: Automatically installs Apptainer if it's not already present on the system
 3. **Switches to seisbio user**: Opens an interactive session as the `seisbio` user
 
@@ -186,7 +186,16 @@ Once Phase 1 is completed, the installed conda environments can be converted int
 
 ## Script Descriptions
 
-### `create_container.sh`
+### `run_container_pipeline.sh`
+
+Runs the complete Phase 2 workflow in order: creates definition files (`.def`) from conda environments and then builds Apptainer containers (`.sif`).
+
+**What it does:**
+- Calls `create_container.sh` first
+- Calls `build_container.sh` after successful definition generation
+- Supports processing one environment (`-e`) or building all definitions (`-a`)
+
+### `create_container.sh` (internal step)
 
 Exports existing conda environments and creates definition files (`.def`) to build Apptainer containers.
 
@@ -198,7 +207,7 @@ Exports existing conda environments and creates definition files (`.def`) to bui
 - Creates `.def` files with instructions for building the containers in the `environments/` folder
 - Creates two directories: `ymls/` for YAML files and `environments/` for definition and container files
 
-### `build_container.sh`
+### `build_container.sh` (internal step)
 
 Builds the Apptainer containers (`.sif` files) from the previously created `.def` files.
 
@@ -211,58 +220,53 @@ Builds the Apptainer containers (`.sif` files) from the previously created `.def
 
 Scripts location in repository:
 
-- `scripts/utilities/create_container.sh`
-- `scripts/utilities/build_container.sh`
+- `scripts/utilities/run_container_pipeline.sh` (recommended)
+- `scripts/utilities/create_container.sh` (used by pipeline)
+- `scripts/utilities/build_container.sh` (used by pipeline)
 
-When running `scripts/seisbio.sh` or `scripts/utilities/create_container.sh` from outside `/home/seisbio/`, both scripts are copied automatically into `/home/seisbio/`.
+When running `scripts/seisbio.sh` or `scripts/utilities/run_container_pipeline.sh` from outside `/home/seisbio/`, required scripts are copied automatically into `/home/seisbio/`.
 
-### Step 1: Grant execution permissions
+### Step 1: Run the complete pipeline
 
-```bash
-chmod +x scripts/utilities/create_container.sh scripts/utilities/build_container.sh
-```
+**Note:** If you run `run_container_pipeline.sh` from outside `/home/seisbio/`, it will automatically copy the necessary files and prompt you to switch to the `seisbio` user. Simply run it again after switching users.
 
-### Step 2: Create definition files
-
-**Note:** If you run `create_container.sh` from outside `/home/seisbio/`, it will automatically copy the necessary files and prompt you to switch to the `seisbio` user. Simply run it again after switching users.
-
-**Option A: Process all environments**
+**Option A: Process only the latest generated `.def` (default build mode)**
 
 ```bash
-./scripts/utilities/create_container.sh
+./scripts/utilities/run_container_pipeline.sh
 ```
 
-This will process all available conda environments (except `base`).
+This will create `.def` files and build only the most recent `.def` into a `.sif`.
 
 **Option B: Process a specific environment**
 
 ```bash
-./scripts/utilities/create_container.sh -e samtools
-./scripts/utilities/create_container.sh --env fastqc
+./scripts/utilities/run_container_pipeline.sh -e samtools
+./scripts/utilities/run_container_pipeline.sh --env fastqc
 ```
 
-This will process only the specified environment.
+This will generate and build only the specified environment.
+
+**Option C: Build all generated `.def` files**
+
+```bash
+./scripts/utilities/run_container_pipeline.sh -a
+```
+
+This processes environments and builds all available `.def` files.
 
 **View help:**
 
 ```bash
-./scripts/utilities/create_container.sh -h
+./scripts/utilities/run_container_pipeline.sh -h
 ```
 
-### Step 3: Build the containers
-
-**Requires root permissions (sudo)**
-
-```bash
-sudo ./scripts/utilities/build_container.sh
-```
-
-This process may take quite some time, as it:
+The process may take quite some time, as it:
 - Downloads the Docker base image (continuumio/miniconda3)
 - Installs all dependencies inside each container
 - Creates self-contained and portable containers
 
-**Step 3 Results:**
+**Step 1 Results:**
 
 After the build process:
 - `ymls/` folder contains: `<name>_environment.yml` files (exported conda environments)
