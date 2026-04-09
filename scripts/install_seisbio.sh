@@ -29,6 +29,7 @@ BASE_PACKAGES_FILE="../base/base_packages.txt"
 INSTALL_BASE_PACKAGES=false
 LOCAL_INSTALL=false
 SHARED_EXPORT_GROUP="seisbio-share"
+INSTALL_SNAKEPIPES=false
 
 # Function to display usage
 usage() {
@@ -57,6 +58,8 @@ usage() {
     echo "                                            Without [file], uses the default: ./base/base_packages.txt"
     echo "                                            Base packages are NOT installed unless this flag is used."
     echo "  --local                                   Prefers a local installation instead of a system wide installation. Does not need root access."
+    echo "  -s, --snakepipes                          Enable snakePipes environment installation using required channels."
+    echo "                                            If not set, snakePipes entries in env files are skipped."
     echo "  -h, --help                                Display this help message and exit."
     exit 1
 }
@@ -110,6 +113,9 @@ while [[ "$#" -gt 0 ]]; do
             ;;
         --local)
             LOCAL_INSTALL=true
+            ;;
+        -s|--snakepipes)
+            INSTALL_SNAKEPIPES=true
             ;;
         -h|--help)
             usage
@@ -632,6 +638,7 @@ install_virtual_envs() {
     local distribution="$3"
     local home="$4"
     local uid="$5"
+    local snakepipes_installer="$SCRIPT_DIR/utilities/install_snakepipes.sh"
 
     IFS=' ' read -r -a pkg_list <<< "$pkg_list_str" # Convert string back to array
 
@@ -656,13 +663,33 @@ install_virtual_envs() {
             echo "[INSTALLING] Environment for $envname package"
             local pkgs_to_install="$pkg"
             local channels="-c bioconda -c conda-forge"
+            local pkg_base="${pkg%%=*}"
 
             # Conditional cases (similar to Python script)
             if [[ "$envname" == *"hicexplorer"* ]]; then
                 pkgs_to_install="$pkg hic2cool"
-            elif [[ "$pkg" == "snakePipes" ]]; then
-                channels="-c mpi-ie"
-                pkgs_to_install="snakePipes"
+            elif [[ "${pkg_base,,}" == "snakepipes" ]]; then
+                if [[ "$INSTALL_SNAKEPIPES" != "true" ]]; then
+                    echo "[SKIP] snakePipes requested but -s/--snakepipes was not set. Skipping package entry: $pkg"
+                    continue
+                fi
+
+                if [[ ! -x "$snakepipes_installer" ]]; then
+                    echo "[ERROR] snakePipes installer script is missing or not executable: $snakepipes_installer"
+                    continue
+                fi
+
+                echo "[INSTALLING] snakePipes with required channels (conda-forge, bioconda, mpi-ie)"
+                "$snakepipes_installer" \
+                    --manager "$manager" \
+                    --distribution "$distribution" \
+                    --home "$home" \
+                    --env-name "$envname" \
+                    --package-spec "$pkg" || {
+                    echo "[ERROR] Failed to create $envname."
+                    continue
+                }
+                continue
             fi
 
             # Use sudo -i -u to run in a login shell with proper conda initialization
