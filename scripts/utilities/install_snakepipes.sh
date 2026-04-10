@@ -72,8 +72,19 @@ echo "[INFO] Channels: conda-forge, bioconda, mpi-ie"
 
 echo "[INFO] Package spec: $PACKAGE_SPEC"
 
+create_cmd="cd /home/$HOME_USER && \"$CONDA_BIN\" create -n \"$ENV_NAME\" -c conda-forge -c bioconda -c mpi-ie \"$PACKAGE_SPEC\" -y -q"
+clean_cmd="cd /home/$HOME_USER && \"$CONDA_BIN\" clean -a -y"
+
 if [[ "$(id -un)" == "$HOME_USER" ]]; then
-    "$CONDA_BIN" create -n "$ENV_NAME" -c conda-forge -c bioconda -c mpi-ie "$PACKAGE_SPEC" -y -q
+    if ! bash -lc "$create_cmd"; then
+        echo "[WARN] Initial snakePipes create failed. Cleaning conda cache and retrying once..."
+        bash -lc "$clean_cmd"
+        bash -lc "$create_cmd"
+    fi
 else
-    sudo -u "$HOME_USER" "$CONDA_BIN" create -n "$ENV_NAME" -c conda-forge -c bioconda -c mpi-ie "$PACKAGE_SPEC" -y -q
+    if ! sudo -i -u "$HOME_USER" bash -lc "$create_cmd"; then
+        echo "[WARN] Initial snakePipes create failed. Cleaning conda cache and retrying once..."
+        sudo -i -u "$HOME_USER" bash -lc "$clean_cmd"
+        sudo -i -u "$HOME_USER" bash -lc "$create_cmd"
+    fi
 fi
