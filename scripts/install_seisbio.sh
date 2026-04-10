@@ -545,7 +545,7 @@ install_env_from_yml() {
     }
     
     # Check if environment already exists
-    local env_info=$(sudo -i -u "$home" bash -c "conda env list" | awk '{print $1}')
+    local env_info=$(sudo -i -u "$home" bash -c "~/$distribution/bin/conda env list" | awk '{print $1}')
     
     if [[ "$env_info" =~ "$env_name" ]]; then
         echo "[WARN] Environment '$env_name' already exists!"
@@ -647,7 +647,7 @@ install_virtual_envs() {
     echo "[INFO] Installing virtual environments for bioinformatics programs."
 
     # Get existing environments as the target user (using login shell)
-    local env_info=$(sudo -i -u "$home" bash -c "conda env list" | awk '{print $1}')
+    local env_info=$(sudo -i -u "$home" bash -c "~/$distribution/bin/conda env list" | awk '{print $1}')
 
     for pkg in "${pkg_list[@]}"; do
         local envname=""
@@ -693,7 +693,7 @@ install_virtual_envs() {
             fi
 
             # Use sudo -i -u to run in a login shell with proper conda initialization
-	    sudo -i -u "$home" bash -c "~/$distribution/bin/$manager create -n $envname $channels $pkgs_to_install -y -q" || { echo "[ERROR] Failed to create $envname."; continue; }
+        sudo -i -u "$home" bash -c "cd /home/$home && ~/$distribution/bin/$manager create -n $envname $channels $pkgs_to_install -y -q" || { echo "[ERROR] Failed to create $envname."; continue; }
     else
             echo "[NOT INSTALLING] $envname: already installed!"
         fi
