@@ -14,7 +14,7 @@ This directory contains Python utilities to support SEISbio workflows.
 
 ## Quick setup
 
-From this directory (`scripts/python/`):
+From this directory (`bin/python/`):
 
 ```bash
 python3 -m venv venv
@@ -28,15 +28,15 @@ python3 -m pip install -r requirements.txt
 ### TUI mode (if `trogon` is installed)
 
 ```bash
-python3 scripts/python/conda_env_tui.py
+python3 bin/python/conda_env_tui.py
 ```
 
 ### CLI mode
 
 ```bash
-python3 scripts/python/conda_env_tui.py --name myenv --python 3.11
-python3 scripts/python/conda_env_tui.py --prefix /tmp/myenv --channel conda-forge --channel bioconda samtools
-python3 scripts/python/conda_env_tui.py --name bio --file envs/structural_biology.txt --dry-run
+python3 bin/python/conda_env_tui.py --name myenv --python 3.11
+python3 bin/python/conda_env_tui.py --prefix /tmp/myenv --channel conda-forge --channel bioconda samtools
+python3 bin/python/conda_env_tui.py --name bio --file envs/structural_biology.txt --dry-run
 ```
 
 ## How `conda_env_tui.py` works

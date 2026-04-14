@@ -5,10 +5,10 @@ This project provides an automated system to install and manage bioinformatics s
 
 ## Complete Workflow
 
-### Phase 1: SEISbio System Installation (`scripts/install_seisbio.sh`)
-### Optional: Environment Backup (`scripts/env-backup.sh`)
-### Transition: Environment Preparation (`scripts/seisbio.sh`)
-### Phase 2: Apptainer Container Creation (`scripts/utilities/run_container_pipeline.sh`)
+### Phase 1: SEISbio System Installation (`bin/install_seisbio.sh`)
+### Optional: Environment Backup (`bin/env-backup.sh`)
+### Transition: Environment Preparation (`bin/seisbio.sh`)
+### Phase 2: Apptainer Container Creation (`bin/utilities/run_container_pipeline.sh`)
 
 ## Dependencies
 
@@ -80,7 +80,7 @@ Each line contains the name of a conda-forge or bioconda package. Version can be
 
 **Syntax:**
 ```bash
-sudo ./scripts/install_seisbio.sh [OPTIONS]
+sudo ./bin/install_seisbio.sh [OPTIONS]
 ```
 
 ### Phase 1 Results
@@ -95,7 +95,7 @@ After running `install_seisbio.sh`:
 
 ### Description of `env-backup.sh` script
 
-If you already have conda environments in your current user and want to reuse them in SEISbio, you can export them first with `scripts/env-backup.sh`.
+If you already have conda environments in your current user and want to reuse them in SEISbio, you can export them first with `bin/env-backup.sh`.
 
 **What it does:**
 1. **Auto-detects**: Detects conda distribution (miniforge/miniconda) and package manager (mamba/conda)
@@ -108,27 +108,27 @@ If you already have conda environments in your current user and want to reuse th
 
 **Export all environments to seisbio:**
 ```bash
-./scripts/env-backup.sh
+./bin/env-backup.sh
 ```
 
 **Export a specific environment:**
 ```bash
-./scripts/env-backup.sh -e test-env
+./bin/env-backup.sh -e test-env
 ```
 
 **Export to a different user:**
 ```bash
-./scripts/env-backup.sh -u myuser
+./bin/env-backup.sh -u myuser
 ```
 
 **Force specific distribution and manager:**
 ```bash
-./scripts/env-backup.sh -d miniconda -m conda
+./bin/env-backup.sh -d miniconda -m conda
 ```
 
 **View help:**
 ```bash
-./scripts/env-backup.sh -h
+./bin/env-backup.sh -h
 ```
 
 ### env-backup Options
@@ -141,7 +141,7 @@ If you already have conda environments in your current user and want to reuse th
 
 ### env-backup Results
 
-After running `scripts/env-backup.sh`, the following files are created in `/home/seisbio/`:
+After running `bin/env-backup.sh`, the following files are created in `/home/seisbio/`:
 
 ```
 ymls/
@@ -151,7 +151,7 @@ ymls/
 These YAML files can be installed later with:
 
 ```bash
-sudo ./scripts/install_seisbio.sh --yml /home/seisbio/ymls
+sudo ./bin/install_seisbio.sh --yml /home/seisbio/ymls
 ```
 
 ## Transition: Environment Preparation
@@ -170,7 +170,7 @@ The `seisbio.sh` script is a helper that facilitates the transition between Phas
 Run this script after completing Phase 1 and before starting Phase 2:
 
 ```bash
-./scripts/seisbio.sh
+./bin/seisbio.sh
 ```
 
 This command will:
@@ -220,11 +220,11 @@ Builds the Apptainer containers (`.sif` files) from the previously created `.def
 
 Scripts location in repository:
 
-- `scripts/utilities/run_container_pipeline.sh` (recommended)
-- `scripts/utilities/create_container.sh` (used by pipeline)
-- `scripts/utilities/build_container.sh` (used by pipeline)
+- `bin/utilities/run_container_pipeline.sh` (recommended)
+- `bin/utilities/create_container.sh` (used by pipeline)
+- `bin/utilities/build_container.sh` (used by pipeline)
 
-When running `scripts/seisbio.sh` or `scripts/utilities/run_container_pipeline.sh` from outside `/home/seisbio/`, required scripts are copied automatically into `/home/seisbio/`.
+When running `bin/seisbio.sh` or `bin/utilities/run_container_pipeline.sh` from outside `/home/seisbio/`, required scripts are copied automatically into `/home/seisbio/`.
 
 ### Step 1: Run the complete pipeline
 
@@ -233,7 +233,7 @@ When running `scripts/seisbio.sh` or `scripts/utilities/run_container_pipeline.s
 **Option A: Process only the latest generated `.def` (default build mode)**
 
 ```bash
-./scripts/utilities/run_container_pipeline.sh
+./bin/utilities/run_container_pipeline.sh
 ```
 
 This will create `.def` files and build only the most recent `.def` into a `.sif`.
@@ -241,8 +241,8 @@ This will create `.def` files and build only the most recent `.def` into a `.sif
 **Option B: Process a specific environment**
 
 ```bash
-./scripts/utilities/run_container_pipeline.sh -e samtools
-./scripts/utilities/run_container_pipeline.sh --env fastqc
+./bin/utilities/run_container_pipeline.sh -e samtools
+./bin/utilities/run_container_pipeline.sh --env fastqc
 ```
 
 This will generate and build only the specified environment.
@@ -250,7 +250,7 @@ This will generate and build only the specified environment.
 **Option C: Build all generated `.def` files**
 
 ```bash
-./scripts/utilities/run_container_pipeline.sh -a
+./bin/utilities/run_container_pipeline.sh -a
 ```
 
 This processes environments and builds all available `.def` files.
@@ -258,7 +258,7 @@ This processes environments and builds all available `.def` files.
 **View help:**
 
 ```bash
-./scripts/utilities/run_container_pipeline.sh -h
+./bin/utilities/run_container_pipeline.sh -h
 ```
 
 The process may take quite some time, as it:
@@ -315,7 +315,7 @@ The `uninstall_seisbio.sh` script removes the SEISbio installation. It supports 
 
 **System-wide uninstall (requires root):**
 ```bash
-sudo ./scripts/uninstall_seisbio.sh
+sudo ./bin/uninstall_seisbio.sh
 ```
 
 ### Uninstall Script Flags
@@ -328,27 +328,27 @@ sudo ./scripts/uninstall_seisbio.sh
 
 **1) Local uninstall for current user:**
 ```bash
-./scripts/uninstall_seisbio.sh --local
+./bin/uninstall_seisbio.sh --local
 ```
 
 **2) Local uninstall using Miniconda folder:**
 ```bash
-./scripts/uninstall_seisbio.sh --local --distribution miniconda
+./bin/uninstall_seisbio.sh --local --distribution miniconda
 ```
 
 **3) System-wide uninstall (default distribution: miniforge):**
 ```bash
-sudo ./scripts/uninstall_seisbio.sh
+sudo ./bin/uninstall_seisbio.sh
 ```
 
 **4) System-wide uninstall specifying distribution folder:**
 ```bash
-sudo ./scripts/uninstall_seisbio.sh -d miniconda
+sudo ./bin/uninstall_seisbio.sh -d miniconda
 ```
 
 **5) Show script help:**
 ```bash
-./scripts/uninstall_seisbio.sh --help
+./bin/uninstall_seisbio.sh --help
 ```
 
 **Note:** During system-wide uninstall, the script also prompts whether to remove Debian/Ubuntu and Arch/AUR packages listed in this repository.

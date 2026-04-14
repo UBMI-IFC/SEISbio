@@ -638,7 +638,7 @@ install_virtual_envs() {
     local distribution="$3"
     local home="$4"
     local uid="$5"
-    local snakepipes_installer="$SCRIPT_DIR/utilities/install_snakepipes.sh"
+    local snakepipes_installer="$SCRIPT_DIR/../scripts/install_snakepipes.sh"
 
     IFS=' ' read -r -a pkg_list <<< "$pkg_list_str" # Convert string back to array
 

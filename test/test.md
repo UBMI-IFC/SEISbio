@@ -61,7 +61,7 @@ git checkout incus-testing
 ### 3. Run the installer
 
 ```bash
-sudo scripts/install_seisbio.sh ...
+sudo bin/install_seisbio.sh ...
 ```
 
 ### 4. Install Apptainer
@@ -96,13 +96,13 @@ Create the example environment from the yml included in the repository, then run
 conda env list
 
 # Run cloner.sh targeting the example environment
-sudo scripts/cloner.sh -e muscle-env
+sudo bin/cloner.sh -e muscle-env
 ```
 
 ### 7. Switch to the seisbio user
 
 ```bash
-sudo scripts/seisbio.sh
+sudo bin/seisbio.sh
 ```
 
 This will open a session as the `seisbio` user. From there, run the following checks:
