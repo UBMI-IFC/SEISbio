@@ -80,7 +80,7 @@ Each line contains the name of a conda-forge or bioconda package. Version can be
 
 **Syntax:**
 ```bash
-sudo ./bin/install_seisbio.sh [OPTIONS]
+sudo ./install_seisbio.sh [OPTIONS]
 ```
 
 ### Phase 1 Results
