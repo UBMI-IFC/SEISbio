@@ -1,0 +1,5 @@
+# Extra packages (installed in base conda/mamba env)
+# Lines starting with # are ignored
+
+click
+trogon

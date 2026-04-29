@@ -26,6 +26,7 @@ YML_DIR="../ymls"
 YML_DIR_PATH=""
 INSTALL_YML_ENVS=false
 BASE_PACKAGES_FILE="../base/base_packages.txt"
+EXTRA_PACKAGES_FILE="../base/extra_packages.txt"
 INSTALL_BASE_PACKAGES=false
 LOCAL_INSTALL=false
 SHARED_EXPORT_GROUP="seisbio-share"
@@ -500,6 +501,41 @@ install_distribution_base() {
     sudo -i -u "$home" bash -c "~/$distribution/bin/$manager install -y -q $packages" || { echo "[ERROR] Failed to install base packages."; return 1; }    
 }
 
+# Function to install extra packages (always installed)
+install_extra_packages() {
+    local manager="$1"
+    local distribution="$2"
+    local home="$3"
+    local uid="$4"
+    local packages_file="$5"
+
+    if [[ "$packages_file" != /* ]]; then
+        packages_file="$SCRIPT_DIR/$packages_file"
+    fi
+
+    if [[ ! -f "$packages_file" ]]; then
+        echo "[ERROR] Extra packages file not found: $packages_file"
+        return 1
+    fi
+
+    echo "[INFO] Reading extra packages from: $packages_file"
+    local packages
+    packages=$(read_env_file "$packages_file")
+
+    if [[ -z "$packages" ]]; then
+        echo "[WARN] No packages found in $packages_file (all commented out or empty)"
+        echo "[INFO] Skipping extra packages installation."
+        return 0
+    fi
+
+    echo "[INFO] Installing extra packages into $distribution base environment"
+    echo "[INFO] Packages to install: $packages"
+    sudo -i -u "$home" bash -c "~/$distribution/bin/$manager install -y -q -c conda-forge $packages" || {
+        echo "[ERROR] Failed to install extra packages."
+        return 1
+    }
+}
+
 # Function to install environment from YAML file
 install_env_from_yml() {
     local yml_file="$1"
@@ -757,6 +793,18 @@ verify_input_files() {
     else
         echo "[INFO] Base packages installation skipped (use -b to enable)"
     fi
+
+    # Verify extra packages file (always required)
+    local extra_file="$EXTRA_PACKAGES_FILE"
+    if [[ "$extra_file" != /* ]]; then
+        extra_file="$SCRIPT_DIR/$extra_file"
+    fi
+    if [[ ! -f "$extra_file" ]]; then
+        echo "[ERROR] Extra packages file not found: $extra_file"
+        errors=$((errors + 1))
+    else
+        echo "[OK] Extra packages file found: $extra_file"
+    fi
     
     # Verify YAML directory and its files if --yml/--yaml was specified
     if [[ "$INSTALL_YML_ENVS" == "true" ]]; then
@@ -924,6 +972,10 @@ main() {
             fi
         fi
 
+        if ! install_extra_packages "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID" "$EXTRA_PACKAGES_FILE"; then
+            exit 1
+        fi
+
         if [[ -n "$ENV_FILE" ]]; then
             echo "[INFO] virtual envs."
             ENV_LIST=$(read_env_file "$ENV_FILE_PATH")
@@ -1058,6 +1110,10 @@ main() {
         else
             echo "[INFO] Skipping base packages installation (use -b to enable)."
         fi
+    fi
+
+    if ! install_extra_packages "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID" "$EXTRA_PACKAGES_FILE"; then
+        exit 1
     fi
 
     if [[ -n "$ENV_FILE" ]]; then
