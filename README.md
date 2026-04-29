@@ -5,6 +5,9 @@ This project provides an automated system to install and manage bioinformatics s
 
 ## Complete Workflow
 
+> [!NOTE]
+> This README is a guide to the full workflow. If you only need one phase, jump to that section below.
+
 ### Phase 1: SEISbio System Installation (`bin/install_seisbio.sh`)
 ### Optional: Environment Backup (`bin/env-backup.sh`)
 ### Transition: Environment Preparation (`bin/seisbio.sh`)
@@ -19,6 +22,9 @@ SEISbio supports Debian/Ubuntu and Arch Linux based systems.
 - `bash`, `sudo`, and standard GNU/Linux utilities
 - Conda distribution installed by the project (`Miniforge` or `Miniconda`)
 - `apptainer` (required to build and run `.sif` containers)
+
+> [!IMPORTANT]
+> Phase 2 requires `apptainer`. Install it before running any container build step.
 
 ### Debian/Ubuntu Package Dependencies
 
@@ -76,12 +82,15 @@ The `install_seisbio.sh` script performs a complete installation of the SEISbio 
 
 Each line contains the name of a conda-forge or bioconda package. Version can be specified: `hicexplorer=3.2`
 
-### Usage of install_seisbio.sh
+### Usage of install_seisbio.sh 
 
 **Syntax:**
 ```bash
-sudo ./install_seisbio.sh [OPTIONS]
+sudo ./bin/install_seisbio.sh [OPTIONS]
 ```
+
+> [!WARNING]
+> This script can install system packages and modify `/etc/bash.bashrc`. Review options before running on shared systems.
 
 ### Phase 1 Results
 
@@ -120,6 +129,9 @@ If you already have conda environments in your current user and want to reuse th
 ```bash
 ./bin/env-backup.sh -u myuser
 ```
+
+> [!TIP]
+> Use `-e` to export a single environment first and verify the YAML output before exporting everything.
 
 **Force specific distribution and manager:**
 ```bash
@@ -164,6 +176,9 @@ The `seisbio.sh` script is a helper that facilitates the transition between Phas
 1. **Copies necessary files**: Transfers `virtual_envs.txt`, `small_virtual_envs.txt`, Phase 2 utility scripts, and `install_seisbio.sh` to the `/home/seisbio/` directory
 2. **Verifies Apptainer installation**: Automatically installs Apptainer if it's not already present on the system
 3. **Switches to seisbio user**: Opens an interactive session as the `seisbio` user
+
+> [!NOTE]
+> If Apptainer is installed system-wide already, this step simply verifies it and continues.
 
 ### Usage of seisbio.sh
 
@@ -230,6 +245,9 @@ When running `bin/seisbio.sh` or `bin/utilities/run_container_pipeline.sh` from 
 
 **Note:** If you run `run_container_pipeline.sh` from outside `/home/seisbio/`, it will automatically copy the necessary files and prompt you to switch to the `seisbio` user. Simply run it again after switching users.
 
+> [!IMPORTANT]
+> The pipeline must run as the `seisbio` user; otherwise environment exports and container builds will fail.
+
 **Option A: Process only the latest generated `.def` (default build mode)**
 
 ```bash
@@ -265,6 +283,9 @@ The process may take quite some time, as it:
 - Downloads the Docker base image (continuumio/miniconda3)
 - Installs all dependencies inside each container
 - Creates self-contained and portable containers
+
+> [!NOTE]
+> Build time and disk usage can be significant for large environment lists. Plan storage accordingly.
 
 **Step 1 Results:**
 
@@ -311,6 +332,9 @@ The `uninstall_seisbio.sh` script removes the SEISbio installation. It supports 
 - Optionally removes Debian/Ubuntu or Arch/AUR packages installed by SEISbio
 - Removes the `seisbio` user and their home directory 
 
+> [!WARNING]
+> System-wide uninstall removes the `seisbio` user and their home directory. Back up any custom data first.
+
 ### Usage of uninstall_seisbio.sh
 
 **System-wide uninstall (requires root):**
@@ -353,3 +377,6 @@ sudo ./bin/uninstall_seisbio.sh -d miniconda
 
 **Note:** During system-wide uninstall, the script also prompts whether to remove Debian/Ubuntu and Arch/AUR packages listed in this repository.
 
+## Additional tools
+
+- [`EasyCondaEnv`](https://github.com/Alejandro-Estrada-1/EasyCondaEnv): Helper to quickly create and manage Conda/Mamba environments (useful as a companion tool to SEISbio workflows).
