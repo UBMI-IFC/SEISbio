@@ -1,4 +1,4 @@
-![SEISbio banner](seisbio.png)
+![SEISbio banner](assets/seisbio.png)
 
 # SEISbio
 Standardized System for Bioinformatics Software Installation

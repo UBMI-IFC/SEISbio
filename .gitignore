@@ -71,14 +71,6 @@ instance/
 # Sphinx documentation
 docs/_build/
 
-# Images
-*.png
-*.jpg
-*.jpeg
-*.gif
-*.webp
-*.svg
-
 # PyBuilder
 target/
 
