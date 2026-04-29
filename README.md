@@ -1,3 +1,5 @@
+![SEISbio banner](seisbio.png)
+
 # SEISbio
 Standardized System for Bioinformatics Software Installation
 
