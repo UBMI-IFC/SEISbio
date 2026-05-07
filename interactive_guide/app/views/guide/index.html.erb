@@ -1,0 +1,112 @@
+<div class="page" data-controller="command-generator">
+  <header class="hero">
+    <p class="tag">SEISbio · Guía interactiva</p>
+    <h1>Instalación, ambientes y flujos seguros</h1>
+    <p>
+      Contenido en español, basado en la guía de conda y adaptado a los scripts de SEISbio.
+      Todos los ejemplos están pensados para ser ligeros y no afectar tu flujo.
+    </p>
+  </header>
+
+  <section class="card">
+    <h2>Tabla de contenido</h2>
+    <ul class="toc">
+      <% @sections.each do |section| %>
+        <li><a href="##{section[:id]}"><%= section[:title] %></a></li>
+      <% end %>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>Generador de comandos (modo demostración seguro)</h2>
+    <p>
+      Ajusta los parámetros y copia el comando. Por defecto se agrega <code>--dry-run</code>.
+    </p>
+
+    <div class="form-grid">
+      <label>
+        Nombre del ambiente
+        <input type="text" value="demo-env" data-command-generator-target="envName" data-action="input->command-generator#update">
+      </label>
+      <label>
+        Canales (separados por espacio o coma)
+        <input type="text" value="conda-forge bioconda" data-command-generator-target="channels" data-action="input->command-generator#update">
+      </label>
+      <label>
+        Paquetes (separados por espacio)
+        <input type="text" value="samtools" data-command-generator-target="packages" data-action="input->command-generator#update">
+      </label>
+      <label>
+        Archivo de paquetes (opcional)
+        <input type="text" placeholder="envs/small_virtual_envs.txt" data-command-generator-target="file" data-action="input->command-generator#update">
+      </label>
+      <label class="checkbox">
+        <input type="checkbox" checked data-command-generator-target="dryRun" data-action="change->command-generator#update">
+        Modo demostración (--dry-run)
+      </label>
+    </div>
+
+    <div class="command-output">
+      <pre data-command-generator-target="output"></pre>
+      <button type="button" class="copy-button" data-action="command-generator#copy">Copiar comando</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Pasos guiados: instalación de SEISbio</h2>
+    <ol class="steps">
+      <li>
+        Revisa dependencias y decide si será instalación local o del sistema.
+      </li>
+      <li>
+        Ejecuta la instalación (Fase 1):
+        <div class="inline-command">
+          <code>sudo ./bin/install_seisbio.sh</code>
+          <button type="button" class="copy-button" data-action="command-generator#copy" data-copy-text="sudo ./bin/install_seisbio.sh">Copiar</button>
+        </div>
+      </li>
+      <li>
+        Prepara el entorno del usuario:
+        <div class="inline-command">
+          <code>./bin/seisbio.sh</code>
+          <button type="button" class="copy-button" data-action="command-generator#copy" data-copy-text="./bin/seisbio.sh">Copiar</button>
+        </div>
+      </li>
+      <li>
+        Construye contenedores (Fase 2):
+        <div class="inline-command">
+          <code>./bin/utilities/run_container_pipeline.sh -e samtools</code>
+          <button type="button" class="copy-button" data-action="command-generator#copy" data-copy-text="./bin/utilities/run_container_pipeline.sh -e samtools">Copiar</button>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <section class="card">
+    <h2>Pasos guiados: desinstalación</h2>
+    <ol class="steps">
+      <li>
+        Desinstalación local:
+        <div class="inline-command">
+          <code>./bin/uninstall_seisbio.sh --local</code>
+          <button type="button" class="copy-button" data-action="command-generator#copy" data-copy-text="./bin/uninstall_seisbio.sh --local">Copiar</button>
+        </div>
+      </li>
+      <li>
+        Desinstalación del sistema:
+        <div class="inline-command">
+          <code>sudo ./bin/uninstall_seisbio.sh</code>
+          <button type="button" class="copy-button" data-action="command-generator#copy" data-copy-text="sudo ./bin/uninstall_seisbio.sh">Copiar</button>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <section class="content">
+    <% @sections.each do |section| %>
+      <article id="<%= section[:id] %>" class="content-section">
+        <%= render_markdown(section[:content]) %>
+      </article>
+    <% end %>
+  </section>
+</div>

@@ -15,6 +15,23 @@ This project provides an automated system to install and manage bioinformatics s
 ### Transition: Environment Preparation (`bin/seisbio.sh`)
 ### Phase 2: Apptainer Container Creation (`bin/utilities/run_container_pipeline.sh`)
 
+## Guía interactiva (Rails)
+
+El repositorio incluye una guía web en español basada en **guia_conda** y adaptada a SEISbio.  
+Está pensada para uso local y modo demostración seguro (solo muestra comandos).
+
+**Ubicación:** `interactive_guide/`
+
+### Ejecutar la guía localmente
+
+```bash
+cd interactive_guide
+bundle install
+bin/rails server
+```
+
+Luego abre <http://localhost:3000>.
+
 ## Dependencies
 
 SEISbio supports Debian/Ubuntu and Arch Linux based systems.
