@@ -1,0 +1,78 @@
+- id: intro
+  title: "Quick start"
+  description: "If conda is not installed, the sandbox auto-installs Miniforge."
+  commands:
+    - label: "Check conda version"
+      command: "conda --version"
+    - label: "Show configured channels"
+      command: "conda config --show channels"
+
+- id: search
+  title: "Search packages"
+  description: "Check which channel provides the package (avoid default)."
+  commands:
+    - label: "Search tensorflow"
+      command: "conda search tensorflow"
+
+- id: bioconda
+  title: "Search in bioconda"
+  description: "Bioconda hosts bioinformatics software and depends on conda-forge."
+  commands:
+    - label: "Search samtools"
+      command: "conda search -c bioconda samtools"
+
+- id: install
+  title: "Package installation"
+  description: "Install from conda-forge and add bioconda when needed."
+  commands:
+    - label: "Install numpy"
+      command: "conda install numpy"
+    - label: "Install bowtie2 from bioconda"
+      command: "conda install -c bioconda -c conda-forge bowtie2"
+
+- id: envs
+  title: "Virtual environments"
+  description: "Create an environment, activate it, and run the tool."
+  commands:
+    - label: "Create samtools environment"
+      command: "conda create -n samtools-env -c conda-forge -c bioconda samtools"
+    - label: "Activate environment"
+      command: "conda activate samtools-env"
+    - label: "Run samtools"
+      command: "samtools --help"
+    - label: "Deactivate environment"
+      command: "conda deactivate"
+
+- id: examples
+  title: "Python and R examples"
+  description: "Examples of specialized environments."
+  commands:
+    - label: "Create Python environment"
+      command: "conda create -n myenv -c conda-forge python=3.11"
+    - label: "Activate Python environment"
+      command: "conda activate myenv"
+    - label: "Install Python libraries"
+      command: "pip install tensorflow polars seaborn"
+    - label: "Create R environment"
+      command: "conda create -n myRenv -c conda-forge r=4"
+    - label: "Activate R environment"
+      command: "conda activate myRenv"
+    - label: "Check R version"
+      command: "R --version"
+
+- id: tips
+  title: "Useful commands"
+  description: "Update, list packages, and remove environments or packages."
+  commands:
+    - label: "Update base"
+      command: "conda update --all"
+    - label: "Update an environment"
+      command: "conda update -n myenv --all"
+    - label: "List packages"
+      command: "conda list"
+    - label: "List packages in env"
+      command: "conda list -n myenv"
+    - label: "Remove environment"
+      command: "conda remove -n myenv --all"
+    - label: "Remove package"
+      command: "conda remove numpy"

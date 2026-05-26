@@ -1,0 +1,138 @@
+lessons:
+  - id: intro
+    title: "Quick start"
+    description: "Verify conda and channels. Type the command manually."
+    steps:
+      - title: "Check conda version"
+        command: "conda --version"
+        validation:
+          contains:
+            - conda
+            - --version
+      - title: "Show configured channels"
+        command: "conda config --show channels"
+        validation:
+          contains:
+            - conda
+            - config
+            - --show
+            - channels
+
+  - id: search
+    title: "Search packages"
+    description: "Check which channel provides the package (avoid default)."
+    steps:
+      - title: "Search tensorflow"
+        command: "conda search tensorflow"
+        validation:
+          contains: [conda, search, tensorflow]
+
+  - id: bioconda
+    title: "Search in bioconda"
+    description: "Bioconda hosts bioinformatics software and depends on conda-forge."
+    steps:
+      - title: "Search samtools"
+        command: "conda search -c bioconda samtools"
+        validation:
+          contains: [conda, search, samtools]
+
+  - id: install
+    title: "Package installation"
+    description: "Install from conda-forge and add bioconda when needed."
+    steps:
+      - title: "Install numpy"
+        description: "Lightweight install from conda-forge."
+        command: "conda install numpy"
+        validation:
+          contains: [conda, install, numpy]
+      - title: "Install bowtie2 from bioconda"
+        command: "conda install -c bioconda -c conda-forge bowtie2"
+        validation:
+          contains: [conda, install, bowtie2]
+
+  - id: envs
+    title: "Virtual environments"
+    description: "Create and validate a new environment."
+    steps:
+      - title: "Create samtools environment"
+        command: "conda create -n samtools-env -c conda-forge -c bioconda samtools"
+        validation:
+          contains:
+            - conda
+            - create
+            - samtools-env
+        success_command: "conda env list"
+        success_contains: "samtools-env"
+      - title: "Activate environment"
+        command: "conda activate samtools-env"
+        validation:
+          contains:
+            - conda
+            - activate
+            - samtools-env
+        success_command: "conda env list"
+        success_contains: "samtools-env"
+      - title: "Run samtools"
+        command: "samtools --help"
+        validation:
+          contains:
+            - samtools
+            - --help
+
+  - id: examples
+    title: "Python and R examples"
+    description: "Examples of specialized environments."
+    steps:
+      - title: "Create Python environment"
+        command: "conda create -n myenv -c conda-forge python=3.11"
+        validation:
+          contains: [conda, create, myenv]
+      - title: "Activate Python environment"
+        command: "conda activate myenv"
+        validation:
+          contains: [conda, activate, myenv]
+      - title: "Install Python libraries"
+        command: "pip install tensorflow polars seaborn"
+        validation:
+          contains: [pip, install, tensorflow, polars, seaborn]
+      - title: "Create R environment"
+        command: "conda create -n myRenv -c conda-forge r=4"
+        validation:
+          contains: [conda, create, myrenv]
+      - title: "Activate R environment"
+        command: "conda activate myRenv"
+        validation:
+          contains: [conda, activate, myrenv]
+      - title: "Check R version"
+        command: "R --version"
+        validation:
+          contains: [r, --version]
+
+  - id: tips
+    title: "Useful commands"
+    description: "Update, list packages, and remove environments or packages."
+    steps:
+      - title: "Update base"
+        command: "conda update --all"
+        validation:
+          contains: [conda, update]
+      - title: "Update an environment"
+        command: "conda update -n myenv --all"
+        validation:
+          contains: [conda, update, myenv]
+      - title: "List packages"
+        command: "conda list"
+        validation:
+          contains: [conda, list]
+      - title: "List packages in env"
+        command: "conda list -n myenv"
+        validation:
+          contains: [conda, list, myenv]
+      - title: "Remove environment"
+        command: "conda remove -n myenv --all"
+        validation:
+          contains: [conda, remove, myenv]
+      - title: "Remove package"
+        command: "conda remove numpy"
+        validation:
+          contains: [conda, remove, numpy]

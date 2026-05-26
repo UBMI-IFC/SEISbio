@@ -1,0 +1,60 @@
+<% content_for :title, "Conda Guide" %>
+
+<div class="page" data-controller="terminal">
+  <section class="hero">
+    <span class="chip">Per-session Docker sandbox</span>
+    <h1>Conda Guide: Interactive Tutorial</h1>
+    <p>
+      Run real conda commands inside an isolated Docker container. The sandbox is created per
+      session and does not touch your host system.
+    </p>
+  </section>
+
+  <section class="panel">
+    <h2>Quick Guide</h2>
+    <p class="command-desc">
+      Click on a command to run it inside the terminal shown for each section. The sandbox
+      installs Miniforge if needed and keeps your environment active between commands.
+    </p>
+    <div class="terminal-meta">
+      <span class="chip">Miniforge in /opt/miniforge</span>
+      <span class="chip">Temporary environments per session</span>
+    </div>
+  </section>
+
+  <% @sections.each do |section| %>
+    <section class="panel" style="margin-top: 24px;" data-controller="terminal">
+      <h2><%= section[:title] %></h2>
+      <p class="command-desc"><%= section[:description] %></p>
+
+      <div class="terminal-meta">
+        <span data-terminal-target="status">Status: Not started</span>
+      </div>
+
+      <div class="terminal-shell" data-action="click->terminal#focus">
+        <div class="progress-container" data-terminal-target="progress" aria-hidden="true">
+          <div class="progress-bar"></div>
+        </div>
+        <pre class="terminal-output" data-terminal-target="output"></pre>
+        <div class="terminal-input-line">
+          <span class="terminal-prompt">$</span>
+          <input type="text" class="terminal-input-field" placeholder="Type a command and press Enter" data-terminal-target="input" data-action="keydown.enter->terminal#run" />
+        </div>
+      </div>
+
+      <ul class="command-list">
+        <% section[:commands].each do |command| %>
+          <li class="command-card">
+            <div>
+              <p class="command-title"><%= command[:label] %></p>
+              <p class="command-desc"><%= command[:command] %></p>
+            </div>
+            <button class="button" data-action="click->terminal#runCommand" data-terminal-command-param="<%= command[:command] %>">
+              Run
+            </button>
+          </li>
+        <% end %>
+      </ul>
+    </section>
+  <% end %>
+</div>
