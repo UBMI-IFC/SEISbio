@@ -30,7 +30,8 @@ EXTRA_PACKAGES_FILE="../base/extra_packages.txt"
 INSTALL_BASE_PACKAGES=false
 LOCAL_INSTALL=false
 SHARED_EXPORT_GROUP="seisbio-share"
-INSTALL_SNAKEPIPES=false
+INSTALL_SCRIPTS=false
+SCRIPT_FILTER="all"
 
 # Function to display usage
 usage() {
@@ -59,8 +60,9 @@ usage() {
     echo "                                            Without [file], uses the default: ./base/base_packages.txt"
     echo "                                            Base packages are NOT installed unless this flag is used."
     echo "  --local                                   Prefers a local installation instead of a system wide installation. Does not need root access."
-    echo "  -s, --snakepipes                          Enable snakePipes environment installation using required channels."
-    echo "                                            If not set, snakePipes entries in env files are skipped."
+    echo "  -s, --scripts [names]                     Execute optional installation scripts found in the scripts/ directory."
+    echo "                                            Without [names], executes all of them."
+    echo "                                            Example: --scripts \"tutorial\" or --scripts \"tutorial snakepipes\""
     echo "  -h, --help                                Display this help message and exit."
     exit 1
 }
@@ -115,8 +117,12 @@ while [[ "$#" -gt 0 ]]; do
         --local)
             LOCAL_INSTALL=true
             ;;
-        -s|--snakepipes)
-            INSTALL_SNAKEPIPES=true
+        -s|--scripts)
+            INSTALL_SCRIPTS=true
+            if [[ -n "${2:-}" && "${2:-}" != -* ]]; then
+                SCRIPT_FILTER="$2"
+                shift
+            fi
             ;;
         -h|--help)
             usage
@@ -704,28 +710,7 @@ install_virtual_envs() {
             # Conditional cases (similar to Python script)
             if [[ "$envname" == *"hicexplorer"* ]]; then
                 pkgs_to_install="$pkg hic2cool"
-            elif [[ "${pkg_base,,}" == "snakepipes" ]]; then
-                if [[ "$INSTALL_SNAKEPIPES" != "true" ]]; then
-                    echo "[SKIP] snakePipes requested but -s/--snakepipes was not set. Skipping package entry: $pkg"
-                    continue
-                fi
 
-                if [[ ! -x "$snakepipes_installer" ]]; then
-                    echo "[ERROR] snakePipes installer script is missing or not executable: $snakepipes_installer"
-                    continue
-                fi
-
-                echo "[INSTALLING] snakePipes with required channels (conda-forge, bioconda, mpi-ie)"
-                "$snakepipes_installer" \
-                    --manager "$manager" \
-                    --distribution "$distribution" \
-                    --home "$home" \
-                    --env-name "$envname" \
-                    --package-spec "$pkg" || {
-                    echo "[ERROR] Failed to create $envname."
-                    continue
-                }
-                continue
             fi
 
             # Use sudo -i -u to run in a login shell with proper conda initialization
@@ -990,6 +975,39 @@ main() {
             echo "[INFO] Installing additional environments from YAML directory."
             install_envs_from_yml_dir "$YML_DIR_PATH" "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID"
         fi
+
+        # Execute additional scripts if specified
+        if [[ "$INSTALL_SCRIPTS" == "true" ]]; then
+            echo "====================="
+            if [[ "$SCRIPT_FILTER" == "all" ]]; then
+                echo "[INFO] Executing all additional scripts in scripts/ directory"
+            else
+                echo "[INFO] Executing selected scripts containing: '$SCRIPT_FILTER'"
+            fi
+            
+            for script in "$SCRIPT_DIR/../scripts/"*.sh; do
+                script_name=$(basename "$script" .sh)
+                short_name=${script_name#install_}
+                
+                if [[ "$SCRIPT_FILTER" != "all" ]]; then
+                    if [[ ! "$SCRIPT_FILTER" =~ "$short_name" && ! "$SCRIPT_FILTER" =~ "$script_name" ]]; then
+                        continue
+                    fi
+                fi
+                
+                if [[ -x "$script" ]]; then
+                    echo "[RUN] Executing $(basename "$script")"
+                    "$script" \
+                        --manager "$MANAGER" \
+                        --distribution "$DISTRIBUTION" \
+                        --home "$HOME_DIR" || {
+                        echo "[ERROR] $(basename "$script") failed."
+                    }
+                elif [[ -f "$script" ]]; then
+                    echo "[WARN] Script not executable: $(basename "$script")"
+                fi
+            done
+        fi
         
         echo "[END] All packages installed"
 
@@ -1129,6 +1147,39 @@ main() {
         echo "====================="
         echo "[INFO] Installing additional environments from YAML directory."
         install_envs_from_yml_dir "$YML_DIR_PATH" "$MANAGER" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID"
+    fi
+
+    # Execute additional scripts if specified
+    if [[ "$INSTALL_SCRIPTS" == "true" ]]; then
+        echo "====================="
+        if [[ "$SCRIPT_FILTER" == "all" ]]; then
+            echo "[INFO] Executing all additional scripts in scripts/ directory"
+        else
+            echo "[INFO] Executing selected scripts containing: '$SCRIPT_FILTER'"
+        fi
+        
+        for script in "$SCRIPT_DIR/../scripts/"*.sh; do
+            script_name=$(basename "$script" .sh)
+            short_name=${script_name#install_}
+            
+            if [[ "$SCRIPT_FILTER" != "all" ]]; then
+                if [[ ! "$SCRIPT_FILTER" =~ "$short_name" && ! "$SCRIPT_FILTER" =~ "$script_name" ]]; then
+                    continue
+                fi
+            fi
+            
+            if [[ -x "$script" ]]; then
+                echo "[RUN] Executing $(basename "$script")"
+                "$script" \
+                    --manager "$MANAGER" \
+                    --distribution "$DISTRIBUTION" \
+                    --home "$HOME_DIR" || {
+                    echo "[ERROR] $(basename "$script") failed."
+                }
+            elif [[ -f "$script" ]]; then
+                echo "[WARN] Script not executable: $(basename "$script")"
+            fi
+        done
     fi
     
     echo "[END] All packages installed"

@@ -102,6 +102,52 @@ After running `install_seisbio.sh`:
 - Virtual environments created in `/home/seisbio/miniforge/envs/` (one per tool)
 - Conda initialized in `/etc/bash.bashrc` (accessible to all users)
 
+## Interactive Tutorial
+
+SEISbio includes an interactive tutorial to learn and execute bioinformatics commands in a safe, isolated sandbox environment. The tutorial can be run directly in the terminal (TUI) or via a graphical web interface.
+
+### Installation
+
+The tutorial is an **optional** component and is installed alongside other extensions using the `--scripts` flag. You can tell it to specifically install only the tutorial:
+
+```bash
+sudo ./bin/install_seisbio.sh --scripts tutorial
+```
+
+This will automatically:
+1. Create an isolated `tutorial-env` conda environment.
+2. Install Ruby and all required dependencies (Rails, Bundler, etc.).
+3. Copy the tutorial files to the `seisbio` user home.
+4. Configure Docker group permissions.
+
+### Running the Tutorial
+
+To run the tutorial, first switch to the `seisbio` user:
+
+```bash
+bin/seisbio.sh
+conda activate tutorial-env
+cd ~/tutorial-seisbio
+```
+
+**Option A — Terminal UI (no Docker needed):**
+```bash
+bin/rails tutorial:start
+```
+
+**Option B — Web Interface (requires Docker):**
+```bash
+# Build the sandbox image once (first time only)
+bin/build_sandbox_image.sh
+
+# Start the server
+bin/rails server
+```
+
+Then open [http://localhost:3000](http://localhost:3000) in your browser.
+
+> For full documentation on lesson YAML schema and environment variables, see the [tutorial-seisbio README](tutorial-seisbio/README.md).
+
 ## Optional: Export Existing Environments
 
 ### Description of `env-backup.sh` script
