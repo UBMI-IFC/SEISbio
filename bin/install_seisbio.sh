@@ -247,16 +247,22 @@ configure_env_backup_permissions() {
         }
     fi
 
-    sudo usermod -aG "$export_group" "$home_user" || {
-        echo "[ERROR] Failed to add '$home_user' to group '$export_group'"
-        return 1
-    }
-
-    if [[ -n "$exporter_user" ]] && id "$exporter_user" &>/dev/null; then
-        sudo usermod -aG "$export_group" "$exporter_user" || {
-            echo "[ERROR] Failed to add '$exporter_user' to group '$export_group'"
+    if grep -q "^${home_user}:" /etc/passwd; then
+        sudo usermod -aG "$export_group" "$home_user" || {
+            echo "[ERROR] Failed to add '$home_user' to group '$export_group'"
             return 1
         }
+    else
+        echo "[WARN] '$home_user' is a network user (LDAP/AD). Skipping local group assignment."
+        echo "[WARN] env-backup.sh may require sudo on this system."
+    fi
+
+    if [[ -n "$exporter_user" ]] && id "$exporter_user" &>/dev/null; then
+        if grep -q "^${exporter_user}:" /etc/passwd; then
+            sudo usermod -aG "$export_group" "$exporter_user" || {
+                echo "[WARN] Could not add '$exporter_user' to group '$export_group'."
+            }
+        fi
     fi
 
     sudo mkdir -p "$yml_dir" || {
@@ -1079,8 +1085,8 @@ main() {
     fi
 
     configure_env_backup_permissions "$HOME_DIR" || {
-        echo "[ERROR] Could not configure shared permissions for env-backup.sh"
-        exit 1
+        echo "[WARN] Could not fully configure shared permissions for env-backup.sh"
+        echo "[WARN] Installation will continue. env-backup.sh may require sudo on this system."
     }
 
     echo "[INFO] Moving to $HOME_DIR home"
