@@ -1039,7 +1039,7 @@ main() {
 
     # Creating seisbio user
     echo "[INFO] Creating $HOME_DIR user if not exists."
-    if [[ ! -d "/home/$HOME_DIR" ]]; then
+    if [[ ! -d "/home/$HOME_DIR" ]] && ! id "$HOME_DIR" &>/dev/null; then
         echo "[INFO] Creating $HOME_DIR user and asking for a password."
         echo "====================="
         # useradd only works this way in Debian distros
