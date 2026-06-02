@@ -270,10 +270,14 @@ configure_env_backup_permissions() {
         return 1
     }
 
-    sudo chown "$home_user:$export_group" "$yml_dir" || {
-        echo "[ERROR] Failed to set ownership for: $yml_dir"
-        return 1
-    }
+    if grep -q "^${home_user}:" /etc/passwd; then
+        sudo chown "$home_user:$export_group" "$yml_dir" || {
+            echo "[WARN] Failed to set ownership for: $yml_dir"
+        }
+    else
+        echo "[WARN] '$home_user' is a network user. Setting directory ownership to current user."
+        sudo chown -R "$(whoami)" "$yml_dir" 2>/dev/null || true
+    fi
 
     # setgid on directory keeps group ownership for new exported files
     sudo chmod 2775 "$yml_dir" || {
@@ -1045,7 +1049,28 @@ main() {
 
     # Creating seisbio user
     echo "[INFO] Creating $HOME_DIR user if not exists."
-    if [[ ! -d "/home/$HOME_DIR" ]] && ! id "$HOME_DIR" &>/dev/null; then
+    if id "$HOME_DIR" &>/dev/null; then
+        # User actually exists in the system
+        echo "[WARN] $HOME_DIR user already exists!!!"
+        echo "[INFO] Consider to delete this user: \$ sudo userdel -r $HOME_DIR"
+        read -p "Do you want to continue? y/[n]: " ANSWER
+        if [[ "$ANSWER" == "y" ]]; then
+            echo "[INFO] Continue installation"
+        elif [[ "$ANSWER" == "n" ]]; then
+            echo "[END] Exit program doing nothing more!"
+            exit 0
+        else
+            echo "[END] Invalid answer: exit!"
+            exit 1
+        fi
+    else
+        # User does not exist — create it
+        if [[ -d "/home/$HOME_DIR" ]]; then
+            echo "[WARN] Directory /home/$HOME_DIR exists but user '$HOME_DIR' does not."
+            echo "[INFO] This may be leftover from a previous failed installation."
+            echo "[INFO] It will be removed and recreated."
+            sudo rm -rf "/home/$HOME_DIR" || { echo "[ERROR] Failed to remove orphan directory."; exit 1; }
+        fi
         echo "[INFO] Creating $HOME_DIR user and asking for a password."
         echo "====================="
         # useradd only works this way in Debian distros
@@ -1069,19 +1094,6 @@ main() {
         echo "====================="
         echo "[INFO] $HOME_DIR user created"
         echo "====================="
-    else
-        echo "[WARN] $HOME_DIR user already exists!!!"
-        echo "[INFO] Consider to delete this user: \$ sudo userdel -r $HOME_DIR"
-        read -p "Do you want to continue? y/[n]: " ANSWER
-        if [[ "$ANSWER" == "y" ]]; then
-            echo "[INFO] Continue installation"
-        elif [[ "$ANSWER" == "n" ]]; then
-            echo "[END] Exit program doing nothing more!"
-            exit 0
-        else
-            echo "[END] Invalid answer: exit!"
-            exit 1
-        fi
     fi
 
     configure_env_backup_permissions "$HOME_DIR" || {
