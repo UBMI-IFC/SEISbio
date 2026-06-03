@@ -11,6 +11,7 @@ MANAGER=""
 DISTRIBUTION=""
 HOME_USER=""
 ENV_NAME="tutorial-env"
+BASE_PATH="/home"
 
 usage() {
     echo "Usage: $0 --manager <mamba|conda> --distribution <name> --home <user> [OPTIONS]"
@@ -20,7 +21,8 @@ usage() {
     echo ""
     echo "Options:"
     echo "  --manager <mamba|conda>        Conda frontend binary inside the distribution."
-    echo "  --distribution <name>          Distribution directory under /home/<user>/ (e.g. miniforge)."
+    echo "  --distribution <name>          Distribution directory under base path (e.g. miniforge)."
+    echo "  --base-path <path>             Base directory for the installation. [default: /home]"
     echo "  --home <user>                  Target Linux user owning the distribution installation."
     echo "  --env-name <name>              Environment name. [default: tutorial-env]"
     echo "  -h, --help                     Display this help message and exit."
@@ -39,6 +41,10 @@ while [[ "$#" -gt 0 ]]; do
             ;;
         --home)
             HOME_USER="$2"
+            shift
+            ;;
+        --base-path)
+            BASE_PATH="$2"
             shift
             ;;
         --env-name)
@@ -61,9 +67,9 @@ if [[ -z "$MANAGER" || -z "$DISTRIBUTION" || -z "$HOME_USER" ]]; then
     usage
 fi
 
-CONDA_BIN="/home/$HOME_USER/$DISTRIBUTION/bin/$MANAGER"
+CONDA_BIN="$BASE_PATH/$HOME_USER/$DISTRIBUTION/bin/$MANAGER"
 TUTORIAL_SRC_DIR=""
-TUTORIAL_DEST="/home/$HOME_USER/tutorial-seisbio"
+TUTORIAL_DEST="$BASE_PATH/$HOME_USER/tutorial-seisbio"
 
 # Locate the tutorial-seisbio source directory relative to this script
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
@@ -101,7 +107,7 @@ env_exists=$(sudo -i -u "$HOME_USER" bash -c "~/$DISTRIBUTION/bin/conda env list
 if [[ -n "$env_exists" ]]; then
     echo "[INFO] Environment '$ENV_NAME' already exists. Skipping creation."
 else
-    create_cmd="cd /home/$HOME_USER && \"$CONDA_BIN\" create -n \"$ENV_NAME\" -c conda-forge ruby compilers -y -q"
+    create_cmd="cd \"$BASE_PATH/$HOME_USER\" && \"$CONDA_BIN\" create -n \"$ENV_NAME\" -c conda-forge ruby compilers -y -q"
 
     if [[ "$(id -un)" == "$HOME_USER" ]]; then
         bash -lc "$create_cmd" || {
@@ -122,7 +128,7 @@ fi
 echo ""
 echo "[STEP 2/5] Installing Bundler inside '$ENV_NAME'"
 
-bundler_cmd="cd /home/$HOME_USER && source ~/$DISTRIBUTION/etc/profile.d/conda.sh && conda activate $ENV_NAME && gem install bundler --no-document"
+bundler_cmd="cd \"$BASE_PATH/$HOME_USER\" && source ~/$DISTRIBUTION/etc/profile.d/conda.sh && conda activate $ENV_NAME && gem install bundler --no-document"
 
 if [[ "$(id -un)" == "$HOME_USER" ]]; then
     bash -lc "$bundler_cmd" || {

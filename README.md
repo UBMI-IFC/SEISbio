@@ -73,7 +73,7 @@ The `install_seisbio.sh` script performs a complete installation of the SEISbio 
 
 1. **System package installation** (optional): Installs basic and bioinformatics packages from Debian/Ubuntu repositories
 2. **Creation of seisbio user**: Creates a dedicated user with UID/GID 1015 (configurable)
-3. **Distribution installation**: Downloads and installs Miniforge or Miniconda in `/home/seisbio/`
+3. **Distribution installation**: Downloads and installs Miniforge or Miniconda in `/home/seisbio/` (or your custom `--base-path`)
 4. **Base configuration**: Installs base scientific packages (numpy, scipy, pandas, jupyter, R, etc.)
 5. **Virtual environment creation**: Installs independent environments for each bioinformatics tool
 
@@ -86,10 +86,18 @@ Each line contains the name of a conda-forge or bioconda package. Version can be
 
 ### Usage of install_seisbio.sh 
 
+**Interactive Setup Wizard (Recommended):**
+If you run the installation without passing a path flag, SEISbio will automatically detect any mounted external drives (like `/run/media/...`) and present an interactive menu to let you choose where to install the system.
+
 **Syntax:**
 ```bash
 sudo ./bin/install_seisbio.sh [OPTIONS]
 ```
+
+**Key Options:**
+- `--base-path <path>`: Override the interactive menu and install to a specific path (default is `/home`).
+- `-d, --distribution`: Select `miniforge` (default) or `miniconda`.
+- `-f, --envfile`: Specify environment file.
 
 > [!WARNING]
 > This script can install system packages and modify `/etc/bash.bashrc`. Review options before running on shared systems.
@@ -97,11 +105,11 @@ sudo ./bin/install_seisbio.sh [OPTIONS]
 ### Phase 1 Results
 
 After running `install_seisbio.sh`:
-- User `seisbio` created in `/home/seisbio/`
-- Miniforge or Miniconda installed in `/home/seisbio/miniforge/` or `/home/seisbio/miniconda/`
+- User `seisbio` created in `/home/seisbio/` (or your chosen custom path)
+- Miniforge or Miniconda installed in `/home/seisbio/miniforge/`
 - Virtual environments created in `/home/seisbio/miniforge/envs/` (one per tool)
 - Conda initialized in `/etc/bash.bashrc` (accessible to all users)
-
+- **Global configuration saved** to `/etc/seisbio.conf` (enables zero-flag usage for all other scripts).
 ## Interactive Tutorial
 
 SEISbio includes an interactive tutorial to learn and execute bioinformatics commands in a safe, isolated sandbox environment. The tutorial can be run directly in the terminal (TUI) or via a graphical web interface.

@@ -9,16 +9,19 @@ PACKAGE="snakePipes"
 CHANNELS="-c conda-forge -c bioconda -c mpi-ie"
 # ─────────────────────────────────────────────────────────────────────────────
 
+BASE_PATH="/home"
+
 while [[ "$#" -gt 0 ]]; do
     case "$1" in
         --manager)      MANAGER="$2";      shift ;;
         --distribution) DISTRIBUTION="$2"; shift ;;
         --home)         HOME_USER="$2";    shift ;;
+        --base-path)    BASE_PATH="$2";    shift ;;
     esac
     shift
 done
 
-CONDA_BIN="/home/$HOME_USER/$DISTRIBUTION/bin/$MANAGER"
+CONDA_BIN="$BASE_PATH/$HOME_USER/$DISTRIBUTION/bin/$MANAGER"
 [[ ! -x "$CONDA_BIN" ]] && { echo "[ERROR] Conda not found: $CONDA_BIN"; exit 1; }
 
 # Skip if already installed
