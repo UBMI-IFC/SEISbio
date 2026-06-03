@@ -6,6 +6,12 @@ set -e
 
 SELECTED_ENV=""
 BUILD_ALL=false
+SEISBIO_USER="seisbio"
+BASE_PATH="/home"
+
+if [[ -f "/etc/seisbio.conf" ]]; then
+    source /etc/seisbio.conf
+fi
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 CREATE_SCRIPT="${SCRIPT_DIR}/create_container.sh"
@@ -18,6 +24,8 @@ usage() {
     echo "Options:"
     echo "  -e, --env <name>      Process only the specified conda environment"
     echo "  -a, --all             Build all .def files (default: only latest)"
+    echo "  --base-path <path>    Override the default '/home' base path"
+    echo "  --home <name>         Override the default 'seisbio' username"
     echo "  -h, --help            Display this help message and exit"
     exit 1
 }
@@ -30,6 +38,22 @@ while [[ "$#" -gt 0 ]]; do
                 usage
             fi
             SELECTED_ENV="$2"
+            shift
+            ;;
+        --base-path)
+            if [[ -z "$2" || "$2" == -* ]]; then
+                echo "[ERROR] Missing value for $1"
+                usage
+            fi
+            BASE_PATH="$2"
+            shift
+            ;;
+        --home)
+            if [[ -z "$2" || "$2" == -* ]]; then
+                echo "[ERROR] Missing value for $1"
+                usage
+            fi
+            SEISBIO_USER="$2"
             shift
             ;;
         -a|--all)
@@ -66,6 +90,12 @@ CREATE_ARGS=()
 if [[ -n "$SELECTED_ENV" ]]; then
     CREATE_ARGS+=("-e" "$SELECTED_ENV")
 fi
+if [[ "$SEISBIO_USER" != "seisbio" ]]; then
+    CREATE_ARGS+=("--home" "$SEISBIO_USER")
+fi
+if [[ "$BASE_PATH" != "/home" ]]; then
+    CREATE_ARGS+=("--base-path" "$BASE_PATH")
+fi
 
 
 echo "[STEP 1/2] Creating .def files..."
@@ -73,16 +103,16 @@ echo "[STEP 1/2] Creating .def files..."
 
 
 # create_container.sh can exit successfully after copying files and asking for rerun.
-if [[ "$(pwd)" != "/home/seisbio" || "$(whoami)" != "seisbio" ]]; then
-    if [[ "$(whoami)" == "seisbio" && -x "/home/seisbio/create_container.sh" ]]; then
+if [[ "$(pwd)" != "$BASE_PATH/$SEISBIO_USER" || "$(whoami)" != "$SEISBIO_USER" ]]; then
+    if [[ "$(whoami)" == "$SEISBIO_USER" && -x "$BASE_PATH/$SEISBIO_USER/create_container.sh" ]]; then
         echo ""
-        echo "[INFO] Re-running creation step from /home/seisbio as seisbio..."
-        cd /home/seisbio || exit 1
-        "/home/seisbio/create_container.sh" "${CREATE_ARGS[@]}"
+        echo "[INFO] Re-running creation step from $BASE_PATH/$SEISBIO_USER as $SEISBIO_USER..."
+        cd "$BASE_PATH/$SEISBIO_USER" || exit 1
+        "$BASE_PATH/$SEISBIO_USER/create_container.sh" "${CREATE_ARGS[@]}"
     else
         echo ""
         echo "[INFO] Initial setup done."
-        echo "[INFO] Follow create_container.sh instructions, then rerun this script from /home/seisbio as user seisbio."
+        echo "[INFO] Follow create_container.sh instructions, then rerun this script from $BASE_PATH/$SEISBIO_USER as user $SEISBIO_USER."
         exit 0
     fi
 fi

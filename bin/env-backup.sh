@@ -7,6 +7,12 @@ TARGET_USER="seisbio"
 DISTRIBUTION="miniforge"
 MANAGER="mamba"
 SELECTED_ENV=""
+BASE_PATH="/home"
+
+if [[ -f "/etc/seisbio.conf" ]]; then
+    source /etc/seisbio.conf
+    TARGET_USER="$SEISBIO_USER"
+fi
 
 # Handle interruptions (Ctrl+C / Ctrl+Z / kill)
 handle_interrupt() {
@@ -29,6 +35,7 @@ usage() {
     echo "Options:"
     echo "  -e, --env <name>              Export only the specified environment"
     echo "  -u, --user <name>             Target user where ymls/ will be created [default: seisbio]"
+    echo "  --base-path <path>            Override the default '/home' base path"
     echo "  -d, --distribution <name>     Distribution name (miniforge/miniconda) [default: auto-detect]"
     echo "  -m, --manager <name>          Package manager (mamba/conda) [default: auto-detect]"
     echo "  -h, --help                    Display this help message and exit"
@@ -58,6 +65,10 @@ while [[ "$#" -gt 0 ]]; do
             ;;
         -m|--manager)
             MANAGER="$2"
+            shift
+            ;;
+        --base-path)
+            BASE_PATH="$2"
             shift
             ;;
         -h|--help)
@@ -184,7 +195,7 @@ echo "[INFO] Using conda: $($CONDA --version)"
 echo ""
 
 # Ensure target YAML directory exists
-TARGET_YMLS_DIR="/home/$TARGET_USER/ymls"
+TARGET_YMLS_DIR="$BASE_PATH/$TARGET_USER/ymls"
 echo "[INFO] Ensuring target YAML directory exists: $TARGET_YMLS_DIR"
 if [[ -d "$TARGET_YMLS_DIR" ]]; then
     if [[ ! -w "$TARGET_YMLS_DIR" ]]; then

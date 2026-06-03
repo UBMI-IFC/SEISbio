@@ -3,6 +3,12 @@
 #Uninstallation of SEISbio
 
 USERNAME="seisbio"
+BASE_PATH="/home"
+
+if [[ -f "/etc/seisbio.conf" ]]; then
+    source /etc/seisbio.conf
+    USERNAME="$SEISBIO_USER"
+fi
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
 # Auto-detect global bashrc path
@@ -27,6 +33,8 @@ usage() {
     echo "Options:"
     echo "  --local                   Uninstall a local installation (current user). Does not need root access."
     echo "  -d, --distribution <name> Distribution name to remove [default: miniforge]"
+    echo "  --base-path <path>        Base directory of the installation [default: /home]"
+    echo "  --home <name>             User and home directory to remove [default: seisbio]"
     echo "  -h, --help                Display this help message and exit"
     exit 1
 }
@@ -39,6 +47,14 @@ while [[ "$#" -gt 0 ]]; do
             ;;
         -d|--distribution)
             DISTRIBUTION="$2"
+            shift
+            ;;
+        --base-path)
+            BASE_PATH="$2"
+            shift
+            ;;
+        --home)
+            USERNAME="$2"
             shift
             ;;
         -h|--help)
@@ -313,13 +329,19 @@ main() {
     fi
 
     # Remove containers and environments before removing user
-    remove_containers "/home/$USERNAME"
+    remove_containers "$BASE_PATH/$USERNAME"
 
     # Remove user
     remove_seisbio_user "$USERNAME"
 
     # Revert bashrc changes
     revert_bashrc_changes "$BASHRC_PATH"
+    
+    # Remove global config
+    if [[ -f "/etc/seisbio.conf" ]]; then
+        echo "[INFO] Removing global configuration file /etc/seisbio.conf"
+        rm -f "/etc/seisbio.conf"
+    fi
 
     echo ""
     echo "====================================="

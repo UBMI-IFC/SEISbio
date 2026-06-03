@@ -34,6 +34,12 @@ echo "[INFO] Using conda:  $($CONDA --version)"
 
 # Default values
 SELECTED_ENV=""
+BASE_PATH="/home"
+SEISBIO_USER="seisbio"
+
+if [[ -f "/etc/seisbio.conf" ]]; then
+    source /etc/seisbio.conf
+fi
 
 # Function to display usage
 usage() {
@@ -42,6 +48,8 @@ usage() {
     echo ""
     echo "Options:"
     echo "  -e, --env <name>      Process only the specified environment"
+    echo "  --base-path <path>    Override the default '/home' base path"
+    echo "  --home <name>         Override the default 'seisbio' username"
     echo "  -h, --help            Display this help message and exit"
     echo ""
     echo "If -e is not specified, all available conda environments are processed"
@@ -53,6 +61,14 @@ while [[ "$#" -gt 0 ]]; do
     case "$1" in
         -e|--env)
             SELECTED_ENV="$2"
+            shift
+            ;;
+        --base-path)
+            BASE_PATH="$2"
+            shift
+            ;;
+        --home)
+            SEISBIO_USER="$2"
             shift
             ;;
         -h|--help)
@@ -68,26 +84,26 @@ done
 
 # Preparation: copy necessary files and switch to seisbio user
 CURRENT_DIR=$(pwd)
-SEISBIO_HOME="/home/seisbio"
+SEISBIO_HOME="$BASE_PATH/$SEISBIO_USER"
 
-# If not in /home/seisbio, copy necessary files
+# If not in $BASE_PATH/$SEISBIO_USER, copy necessary files
 if [[ "$CURRENT_DIR" != "$SEISBIO_HOME" ]]; then
     echo "[INFO] Copying necessary files to $SEISBIO_HOME..."
     # Get script directory to properly reference files
     SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
     sudo cp "$SCRIPT_DIR/../../envs/virtual_envs.txt" "$SCRIPT_DIR/../../envs/small_virtual_envs.txt" "$SCRIPT_DIR/build_container.sh" "$SCRIPT_DIR/create_container.sh" "$SEISBIO_HOME/" 2>/dev/null
-    sudo chown seisbio:seisbio "$SEISBIO_HOME"/{virtual_envs.txt,small_virtual_envs.txt,build_container.sh,create_container.sh} 2>/dev/null
+    sudo chown "$SEISBIO_USER:$SEISBIO_USER" "$SEISBIO_HOME"/{virtual_envs.txt,small_virtual_envs.txt,build_container.sh,create_container.sh} 2>/dev/null
     
-    echo "[INFO] Switching to $SEISBIO_HOME directory and seisbio user..."
-    echo "[INFO] Run: cd $SEISBIO_HOME && sudo su - seisbio"
+    echo "[INFO] Switching to $SEISBIO_HOME directory and $SEISBIO_USER user..."
+    echo "[INFO] Run: cd $SEISBIO_HOME && sudo su - $SEISBIO_USER"
     echo "[INFO] Then run again: ./create_container.sh"
     exit 0
 fi
 
 # Verify we are seisbio user
-if [[ "$(whoami)" != "seisbio" ]]; then
-    echo "[WARN] This script must be run as 'seisbio' user"
-    echo "Run: sudo su - seisbio"
+if [[ "$(whoami)" != "$SEISBIO_USER" ]]; then
+    echo "[WARN] This script must be run as '$SEISBIO_USER' user"
+    echo "Run: sudo su - $SEISBIO_USER"
     exit 1
 fi
 

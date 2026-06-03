@@ -15,6 +15,8 @@
 
 # Default values
 DISTRIBUTION="miniforge"
+BASE_PATH="/home"
+BASE_PATH_SET=false
 HOME_DIR="seisbio"
 HOME_ID=1015
 DEBIAN_INSTALL=false
@@ -40,8 +42,9 @@ usage() {
     echo ""
     echo "Options:"
     echo "  -d, --distribution <miniforge|miniconda>  Select scientific software distribution. [default: miniforge]"
+    echo "  --base-path <path>                        Base directory for the installation. [default: /home]"
     echo "  --home <name>                             User and home directory to create for the distribution installation. [default: seisbio]"
-    echo "                                            This will be created in /home/"
+    echo "                                            This will be created in \$BASE_PATH/"
     echo "  --homeid <UID>                            Distribution user UID and GUID. [default: 1015]"
     echo "  --debian                                  Install basic and bioinformatic packages from Debian/Ubuntu repositories."
     echo "                                            The lists of packages are specified in the dev directory in SEISbio root directory."
@@ -72,6 +75,11 @@ while [[ "$#" -gt 0 ]]; do
     case "$1" in
         -d|--distribution)
             DISTRIBUTION="$2"
+            shift
+            ;;
+        --base-path)
+            BASE_PATH="$2"
+            BASE_PATH_SET=true
             shift
             ;;
         --home)
@@ -134,6 +142,45 @@ while [[ "$#" -gt 0 ]]; do
     esac
     shift
 done
+
+if [[ "$BASE_PATH_SET" == "false" && "$LOCAL_INSTALL" == "false" ]]; then
+    # Interactive path discovery
+    echo "[INFO] Discovering potential installation paths..."
+    paths=("/home")
+    
+    # Find home directories in mounted media
+    if [[ -n "$SUDO_USER" ]]; then
+        user_to_check="$SUDO_USER"
+    else
+        user_to_check="$(whoami)"
+    fi
+    
+    while IFS= read -r dir; do
+        if [[ -n "$dir" ]]; then
+            paths+=("$dir")
+        fi
+    done < <(find "/run/media/$user_to_check" "/media/$user_to_check" -maxdepth 2 -type d -name "home" 2>/dev/null)
+    
+    if [[ ${#paths[@]} -gt 1 ]]; then
+        echo "====================================="
+        echo "  Select SEISbio Installation Path"
+        echo "====================================="
+        for i in "${!paths[@]}"; do
+            echo "  $i) ${paths[$i]}"
+        done
+        echo "====================================="
+        while true; do
+            read -p "Enter number (0-$((${#paths[@]}-1))): " path_selection
+            if [[ "$path_selection" =~ ^[0-9]+$ ]] && [ "$path_selection" -ge 0 ] && [ "$path_selection" -lt "${#paths[@]}" ]; then
+                BASE_PATH="${paths[$path_selection]}"
+                echo "[INFO] Selected Base Path: $BASE_PATH"
+                break
+            else
+                echo "[ERROR] Invalid selection."
+            fi
+        done
+    fi
+fi
 
 # Validate distribution choice
 if [[ "$DISTRIBUTION" != "miniforge" && "$DISTRIBUTION" != "miniconda" ]]; then
@@ -228,7 +275,7 @@ read_env_file() {
 # Configure shared group permissions so env-backup.sh can write without sudo.
 configure_env_backup_permissions() {
     local home_user="$1"
-    local yml_dir="/home/$home_user/ymls"
+    local yml_dir=""$BASE_PATH"/$home_user/ymls"
     local export_group="$SHARED_EXPORT_GROUP"
     local exporter_user=""
 
@@ -421,7 +468,7 @@ download_distribution() {
 
     local filename
     filename=$(basename "$url")
-    local dest="/home/$home/$filename"
+    local dest=""$BASE_PATH"/$home/$filename"
 
     echo "[INFO] Downloading $distribution installer from $url" >&2
 
@@ -461,14 +508,14 @@ install_distribution() {
     local home="$3"
     local uid="$4"
 
-    echo "[INFO] Installing $distribution to /home/$home/$distribution"
-    sudo -u "$home" bash "/home/$home/$installer" -b -p "/home/$home/$distribution" || { echo "[ERROR] Failed to install $distribution."; exit 1; }
+    echo "[INFO] Installing $distribution to "$BASE_PATH"/$home/$distribution"
+    sudo -u "$home" bash ""$BASE_PATH"/$home/$installer" -b -p ""$BASE_PATH"/$home/$distribution" || { echo "[ERROR] Failed to install $distribution."; exit 1; }
 
     echo "[INFO] Initializing conda for $distribution"
-    sudo -u "$home" "/home/$home/$distribution/bin/conda" init || { echo "[ERROR] Failed to initialize conda."; exit 1; }
+    sudo -u "$home" ""$BASE_PATH"/$home/$distribution/bin/conda" init || { echo "[ERROR] Failed to initialize conda."; exit 1; }
     
     echo "[INFO] Disabling automatic conda base activation"
-    sudo -u "$home" "/home/$home/$distribution/bin/conda" config --set auto_activate_base false || { echo "[ERROR] Failed to disable auto_activate_base."; exit 1; }
+    sudo -u "$home" ""$BASE_PATH"/$home/$distribution/bin/conda" config --set auto_activate_base false || { echo "[ERROR] Failed to disable auto_activate_base."; exit 1; }
 }
 
 # Function to update distribution
@@ -585,7 +632,7 @@ install_env_from_yml() {
     echo "[INFO] Environment name from YAML: $env_name"
     
     # Copy YAML file to seisbio's home to avoid permission issues
-    local temp_yml="/home/$home/temp_env_${env_name}.yml"
+    local temp_yml=""$BASE_PATH"/$home/temp_env_${env_name}.yml"
     echo "[INFO] Copying YAML file to $temp_yml"
     sudo cp "$yml_path" "$temp_yml" || {
         echo "[ERROR] Failed to copy YAML file to seisbio home."
@@ -694,7 +741,7 @@ install_virtual_envs() {
 
     IFS=' ' read -r -a pkg_list <<< "$pkg_list_str" # Convert string back to array
 
-    local home_path="/home/$home/"
+    local home_path=""$BASE_PATH"/$home/"
 
     echo "[INFO] Installing virtual environments for bioinformatics programs."
 
@@ -724,7 +771,7 @@ install_virtual_envs() {
             fi
 
             # Use sudo -i -u to run in a login shell with proper conda initialization
-        sudo -i -u "$home" bash -c "cd /home/$home && ~/$distribution/bin/$manager create -n $envname $channels $pkgs_to_install -y -q" || { echo "[ERROR] Failed to create $envname."; continue; }
+        sudo -i -u "$home" bash -c "cd "$BASE_PATH"/$home && ~/$distribution/bin/$manager create -n $envname $channels $pkgs_to_install -y -q" || { echo "[ERROR] Failed to create $envname."; continue; }
     else
             echo "[NOT INSTALLING] $envname: already installed!"
         fi
@@ -741,11 +788,11 @@ update_bashrc() {
     sudo cp "$GLOBAL_BASHRC" "${GLOBAL_BASHRC}.backup" || { echo "[ERROR] Failed to backup $GLOBAL_BASHRC."; exit 1; }
     echo -e "\n\n# --- Backup of $GLOBAL_BASHRC created\n# --- by SEISbio installation" | sudo tee -a "${GLOBAL_BASHRC}.backup" > /dev/null
 
-    echo "[INFO] Extracting conda initialization script from /home/$home/.bashrc"
-    local conda_text=$(sudo -u "$home" cat "/home/$home/.bashrc" | sed -n '/# >>> conda initialize >>>/,/# <<< conda initialize <<</p')
+    echo "[INFO] Extracting conda initialization script from "$BASE_PATH"/$home/.bashrc"
+    local conda_text=$(sudo -u "$home" cat ""$BASE_PATH"/$home/.bashrc" | sed -n '/# >>> conda initialize >>>/,/# <<< conda initialize <<</p')
 
     if [[ -z "$conda_text" ]]; then
-        echo "[WARN] Something is wrong with /home/$home/.bashrc file! Could not find conda initialization block."
+        echo "[WARN] Something is wrong with "$BASE_PATH"/$home/.bashrc file! Could not find conda initialization block."
         echo "[EXIT!] Exiting program."
         exit 1
     fi
@@ -882,7 +929,7 @@ main() {
     verify_input_files
     
     # Check if YAML directory is specified and seisbio already exists
-    if [[ "$INSTALL_YML_ENVS" == "true" ]] && [[ -d "/home/$HOME_DIR" ]] && [[ -d "/home/$HOME_DIR/$DISTRIBUTION" ]]; then
+    if [[ "$INSTALL_YML_ENVS" == "true" ]] && [[ -d ""$BASE_PATH"/$HOME_DIR" ]] && [[ -d ""$BASE_PATH"/$HOME_DIR/$DISTRIBUTION" ]]; then
         echo "[INFO] YAML directory specified and SEISbio installation detected."
         echo "[INFO] Installing all environments from YAML directory (no system recreation)."
         echo "====================="
@@ -899,7 +946,7 @@ main() {
     fi
 
     # Check if ENV_FILE is specified and seisbio already exists -> only install envs
-    if [[ -n "$ENV_FILE" ]] && [[ -d "/home/$HOME_DIR" ]] && [[ -d "/home/$HOME_DIR/$DISTRIBUTION" ]]; then
+    if [[ -n "$ENV_FILE" ]] && [[ -d ""$BASE_PATH"/$HOME_DIR" ]] && [[ -d ""$BASE_PATH"/$HOME_DIR/$DISTRIBUTION" ]]; then
         echo "[INFO] Environment file specified and SEISbio installation detected."
         echo "[INFO] Installing only virtual environments (no system recreation)."
         echo "====================="
@@ -912,7 +959,7 @@ main() {
     fi
     
     # If YAML directory specified but seisbio doesn't exist, warn and proceed with full installation
-    if [[ "$INSTALL_YML_ENVS" == "true" ]] && [[ ! -d "/home/$HOME_DIR/$DISTRIBUTION" ]]; then
+    if [[ "$INSTALL_YML_ENVS" == "true" ]] && [[ ! -d ""$BASE_PATH"/$HOME_DIR/$DISTRIBUTION" ]]; then
         echo "[INFO] YAML directory specified but SEISbio not installed yet."
         echo "[INFO] Will perform full SEISbio installation first, then install all YAML environments."
         echo "====================="
@@ -930,7 +977,7 @@ main() {
         echo "[INFO] Downloading $DISTRIBUTION distribution."
         INSTALLER_FILENAME=$(download_distribution "$DISTRIBUTION" "$HOME_ID" "$HOME_DIR")
 
-        if [[ ! -d "/home/$HOME_DIR/$DISTRIBUTION" ]]; then
+        if [[ ! -d ""$BASE_PATH"/$HOME_DIR/$DISTRIBUTION" ]]; then
             echo "[INFO] Installing $DISTRIBUTION."
             install_distribution "$INSTALLER_FILENAME" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID"
             INSTALLED=false
@@ -1010,6 +1057,7 @@ main() {
                     "$script" \
                         --manager "$MANAGER" \
                         --distribution "$DISTRIBUTION" \
+                        --base-path "$BASE_PATH" \
                         --home "$HOME_DIR" || {
                         echo "[ERROR] $(basename "$script") failed."
                     }
@@ -1065,11 +1113,11 @@ main() {
         fi
     else
         # User does not exist — create it
-        if [[ -d "/home/$HOME_DIR" ]]; then
-            echo "[WARN] Directory /home/$HOME_DIR exists but user '$HOME_DIR' does not."
+        if [[ -d ""$BASE_PATH"/$HOME_DIR" ]]; then
+            echo "[WARN] Directory "$BASE_PATH"/$HOME_DIR exists but user '$HOME_DIR' does not."
             echo "[INFO] This may be leftover from a previous failed installation."
             echo "[INFO] It will be removed and recreated."
-            sudo rm -rf "/home/$HOME_DIR" || { echo "[ERROR] Failed to remove orphan directory."; exit 1; }
+            sudo rm -rf ""$BASE_PATH"/$HOME_DIR" || { echo "[ERROR] Failed to remove orphan directory."; exit 1; }
         fi
         echo "[INFO] Creating $HOME_DIR user and asking for a password."
         echo "====================="
@@ -1077,18 +1125,33 @@ main() {
         # ArchLinux : install adduser-deb from AUR
         # cmd_create = f"""adduser --shell /bin/bash --uid 1015 --gecos '' {args.home}""".split()
         # run(cmd_create)
-        sudo useradd -s /bin/bash -u "$HOME_ID" -m "$HOME_DIR" || { echo "[ERROR] Failed to create user $HOME_DIR."; exit 1; }
+        sudo useradd -s /bin/bash -u "$HOME_ID" -m -d "$BASE_PATH/$HOME_DIR" "$HOME_DIR" || { echo "[ERROR] Failed to create user $HOME_DIR."; exit 1; }
         # password
         echo "[INFO] Configuring $HOME_DIR user."
         echo "[INPUT] Enter $HOME_DIR user password:"
         sudo passwd "$HOME_DIR" || { echo "[ERROR] Failed to set password for $HOME_DIR."; exit 1; }
         # permissions
-        sudo chmod -R go+r "/home/$HOME_DIR" || { echo "[ERROR] Failed to set permissions for $HOME_DIR."; exit 1; }
-        sudo chmod go+x "/home/$HOME_DIR" || { echo "[ERROR] Failed to set permissions for $HOME_DIR."; exit 1; }
+        sudo chmod -R go+r "$BASE_PATH/$HOME_DIR" || { echo "[ERROR] Failed to set permissions for $HOME_DIR."; exit 1; }
+        sudo chmod go+x "$BASE_PATH/$HOME_DIR" || { echo "[ERROR] Failed to set permissions for $HOME_DIR."; exit 1; }
+
+        # Configure ACLs for auto-mounted media drives to allow the new user to traverse
+        if [[ "$BASE_PATH" == /run/media/* ]] || [[ "$BASE_PATH" == /media/* ]]; then
+            if command -v setfacl &>/dev/null; then
+                echo "[INFO] Configuring ACLs for media drive traversal"
+                local current_dir="$BASE_PATH"
+                while [[ "$current_dir" != "/" && "$current_dir" != "" ]]; do
+                    sudo setfacl -m "u:$HOME_DIR:x" "$current_dir" 2>/dev/null || true
+                    current_dir=$(dirname "$current_dir")
+                done
+            else
+                echo "[WARN] setfacl not found. Media drive installation may fail."
+                echo "[INFO] Please install acl (e.g., sudo apt install acl) or manually grant access."
+            fi
+        fi
         
         # Configure sudo access for build_container.sh
         echo "[INFO] Configuring sudo access for build_container.sh"
-        sudo bash -c "echo '$HOME_DIR ALL=(ALL) NOPASSWD: /home/$HOME_DIR/build_container.sh' > /etc/sudoers.d/$HOME_DIR"
+        sudo bash -c "echo '$HOME_DIR ALL=(ALL) NOPASSWD: "$BASE_PATH"/$HOME_DIR/build_container.sh' > /etc/sudoers.d/$HOME_DIR"
         sudo chmod 440 "/etc/sudoers.d/$HOME_DIR"
 
         echo "====================="
@@ -1109,7 +1172,7 @@ main() {
 
     INSTALLER_FILENAME=$(download_distribution "$DISTRIBUTION" "$HOME_ID" "$HOME_DIR")
 
-    if [[ ! -d "/home/$HOME_DIR/$DISTRIBUTION" ]]; then
+    if [[ ! -d ""$BASE_PATH"/$HOME_DIR/$DISTRIBUTION" ]]; then
         echo "[INFO] Installing $DISTRIBUTION."
         install_distribution "$INSTALLER_FILENAME" "$DISTRIBUTION" "$HOME_DIR" "$HOME_ID"
         echo "[INFO] Updating /etc/bash.bashrc"
@@ -1191,6 +1254,7 @@ main() {
                 "$script" \
                     --manager "$MANAGER" \
                     --distribution "$DISTRIBUTION" \
+                    --base-path "$BASE_PATH" \
                     --home "$HOME_DIR" || {
                     echo "[ERROR] $(basename "$script") failed."
                 }
@@ -1201,6 +1265,13 @@ main() {
     fi
     
     echo "[END] All packages installed"
+
+    if [[ "$LOCAL_INSTALL" == "false" ]]; then
+        echo "[INFO] Saving global configuration to /etc/seisbio.conf"
+        sudo bash -c "echo 'BASE_PATH=\"$BASE_PATH\"' > /etc/seisbio.conf"
+        sudo bash -c "echo 'SEISBIO_USER=\"$HOME_DIR\"' >> /etc/seisbio.conf"
+        sudo chmod 644 /etc/seisbio.conf
+    fi
 
     refresh_group_membership_session "$SUDO_USER"
 }
