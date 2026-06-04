@@ -144,22 +144,30 @@ while [[ "$#" -gt 0 ]]; do
 done
 
 if [[ "$BASE_PATH_SET" == "false" && "$LOCAL_INSTALL" == "false" ]]; then
-    # Interactive path discovery
+    # Interactive path discovery — search ALL real mount points
     echo "[INFO] Discovering potential installation paths..."
     paths=("/home")
     
-    # Find home directories in mounted media
-    if [[ -n "$SUDO_USER" ]]; then
-        user_to_check="$SUDO_USER"
-    else
-        user_to_check="$(whoami)"
-    fi
+    # Collect all real (non-virtual) mount points from the system
+    declare -a mount_points=()
+    while IFS= read -r mp; do
+        [[ -z "$mp" ]] && continue
+        # Skip virtual/system filesystems and the root itself
+        case "$mp" in
+            /|/boot*|/proc*|/sys*|/dev*|/run/lock*|/run/user*|/snap*|/tmp) continue ;;
+        esac
+        mount_points+=("$mp")
+    done < <(findmnt -rno TARGET -t nosysfs,noproc,nodevtmpfs,notmpfs,nodevpts,nocgroup,nocgroup2,noautofs,nosecurityfs,nopstore,noefivarfs,nobpf,nofusectl,noconfigfs,nodebugfs,nohugetlbfs,nomqueue,notracefs 2>/dev/null || mount | awk '{print $3}')
     
-    while IFS= read -r dir; do
-        if [[ -n "$dir" ]]; then
+    # Search for "home" directories inside each mount point (max 2 levels deep)
+    for mp in "${mount_points[@]}"; do
+        while IFS= read -r dir; do
+            [[ -z "$dir" ]] && continue
+            # Avoid duplicating the system /home
+            [[ "$dir" == "/home" ]] && continue
             paths+=("$dir")
-        fi
-    done < <(find "/run/media/$user_to_check" "/media/$user_to_check" -maxdepth 2 -type d -name "home" 2>/dev/null)
+        done < <(find "$mp" -maxdepth 2 -type d -name "home" 2>/dev/null)
+    done
     
     if [[ ${#paths[@]} -gt 1 ]]; then
         echo "====================================="
@@ -1134,17 +1142,17 @@ main() {
         sudo chmod -R go+r "$BASE_PATH/$HOME_DIR" || { echo "[ERROR] Failed to set permissions for $HOME_DIR."; exit 1; }
         sudo chmod go+x "$BASE_PATH/$HOME_DIR" || { echo "[ERROR] Failed to set permissions for $HOME_DIR."; exit 1; }
 
-        # Configure ACLs for auto-mounted media drives to allow the new user to traverse
-        if [[ "$BASE_PATH" == /run/media/* ]] || [[ "$BASE_PATH" == /media/* ]]; then
+        # Configure ACLs for non-standard base paths to allow the new user to traverse
+        if [[ "$BASE_PATH" != "/home" ]]; then
             if command -v setfacl &>/dev/null; then
-                echo "[INFO] Configuring ACLs for media drive traversal"
+                echo "[INFO] Configuring ACLs for base path traversal"
                 local current_dir="$BASE_PATH"
                 while [[ "$current_dir" != "/" && "$current_dir" != "" ]]; do
                     sudo setfacl -m "u:$HOME_DIR:x" "$current_dir" 2>/dev/null || true
                     current_dir=$(dirname "$current_dir")
                 done
             else
-                echo "[WARN] setfacl not found. Media drive installation may fail."
+                echo "[WARN] setfacl not found. Non-standard base path installation may fail."
                 echo "[INFO] Please install acl (e.g., sudo apt install acl) or manually grant access."
             fi
         fi
