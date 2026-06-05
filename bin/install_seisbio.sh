@@ -148,7 +148,7 @@ if [[ "$BASE_PATH_SET" == "false" && "$LOCAL_INSTALL" == "false" ]]; then
     echo "[INFO] Discovering potential installation paths..."
     paths=("/home")
     
-    # Collect all real (non-virtual) mount points from the system
+    # Collect all mount points from the system
     declare -a mount_points=()
     while IFS= read -r mp; do
         [[ -z "$mp" ]] && continue
@@ -157,7 +157,7 @@ if [[ "$BASE_PATH_SET" == "false" && "$LOCAL_INSTALL" == "false" ]]; then
             /|/boot*|/proc*|/sys*|/dev*|/run/lock*|/run/user*|/snap*|/tmp) continue ;;
         esac
         mount_points+=("$mp")
-    done < <(findmnt -rno TARGET -t nosysfs,noproc,nodevtmpfs,notmpfs,nodevpts,nocgroup,nocgroup2,noautofs,nosecurityfs,nopstore,noefivarfs,nobpf,nofusectl,noconfigfs,nodebugfs,nohugetlbfs,nomqueue,notracefs 2>/dev/null || mount | awk '{print $3}')
+    done < <(findmnt -rno TARGET 2>/dev/null || mount | awk '{print $3}')
     
     # Search for "home" directories inside each mount point (max 2 levels deep)
     for mp in "${mount_points[@]}"; do
