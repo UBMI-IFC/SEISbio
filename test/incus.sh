@@ -360,12 +360,15 @@ print_info "Checking if '$DISTRO_IMAGE' is available as $INSTANCE_LABEL..."
 # Try to find the image
 VM_FINGERPRINT=""
 
-# Method 1: Try the image alias directly (works for most distros like debian/12)
-VM_FINGERPRINT=$(incus image list images:"$DISTRO_IMAGE" --format csv -c lft 2>/dev/null | grep "$IMAGE_TYPE" | head -1 | awk -F',' '{print $2}')
+# List all remote images and filter locally (simplestreams remotes don't support direct alias filtering)
+ALL_IMAGES=$(incus image list images: --format csv -c lft 2>/dev/null)
+
+# Method 1: Try the full image alias (e.g. debian/12)
+VM_FINGERPRINT=$(echo "$ALL_IMAGES" | grep "^${DISTRO_IMAGE}[[:space:](,]" | grep "$IMAGE_TYPE" | grep -v "cloud\|desktop\|arm64\|armhf\|riscv\|ppc64\|s390x" | head -1 | awk -F',' '{print $2}')
 
 # Method 2: If not found, try without the version part (e.g. archlinux instead of archlinux/current)
 if [ -z "$VM_FINGERPRINT" ]; then
-    VM_FINGERPRINT=$(incus image list images:"$DISTRO" --format csv -c lft 2>/dev/null | grep "$IMAGE_TYPE" | grep -v "cloud\|desktop\|arm64\|riscv" | head -1 | awk -F',' '{print $2}')
+    VM_FINGERPRINT=$(echo "$ALL_IMAGES" | grep "^${DISTRO}[/[:space:](,]" | grep "$IMAGE_TYPE" | grep -v "cloud\|desktop\|arm64\|armhf\|riscv\|ppc64\|s390x" | head -1 | awk -F',' '{print $2}')
 fi
 
 if [ -z "$VM_FINGERPRINT" ]; then
@@ -373,7 +376,7 @@ if [ -z "$VM_FINGERPRINT" ]; then
     echo ""
     print_info "Available $INSTANCE_LABEL images for '$DISTRO':"
     echo ""
-    incus image list images:"$DISTRO" --format csv -c lft 2>/dev/null | grep "$IMAGE_TYPE"
+    echo "$ALL_IMAGES" | grep "^${DISTRO}" | grep "$IMAGE_TYPE"
     echo ""
     print_info "Try using the distro name without version for rolling releases:"
     if [ "$INSTANCE_TYPE" = "container" ]; then
