@@ -1124,8 +1124,8 @@ main() {
         if [[ -d ""$BASE_PATH"/$HOME_DIR" ]]; then
             echo "[WARN] Directory "$BASE_PATH"/$HOME_DIR exists but user '$HOME_DIR' does not."
             echo "[INFO] This may be leftover from a previous failed installation."
-            echo "[INFO] It will be removed and recreated."
-            sudo rm -rf ""$BASE_PATH"/$HOME_DIR" || { echo "[ERROR] Failed to remove orphan directory."; exit 1; }
+            echo "[INFO] It will be ignored and recreated."
+            #sudo rm -rf ""$BASE_PATH"/$HOME_DIR" || { echo "[ERROR] Failed to remove orphan directory."; exit 1; }
         fi
         echo "[INFO] Creating $HOME_DIR user and asking for a password."
         echo "====================="
@@ -1273,6 +1273,15 @@ main() {
     fi
     
     echo "[END] All packages installed"
+
+    # Fix ownership: the script runs as root so all installed files belong to root.
+    # Transfer everything back to the seisbio user.
+    if [[ "$LOCAL_INSTALL" == "false" ]]; then
+        echo "[INFO] Fixing ownership of $BASE_PATH/$HOME_DIR..."
+        sudo chown -R "$HOME_DIR:$HOME_DIR" "$BASE_PATH/$HOME_DIR" || {
+            echo "[WARN] Could not fix ownership. Run manually: sudo chown -R $HOME_DIR:$HOME_DIR $BASE_PATH/$HOME_DIR"
+        }
+    fi
 
     if [[ "$LOCAL_INSTALL" == "false" ]]; then
         echo "[INFO] Saving global configuration to /etc/seisbio.conf"
